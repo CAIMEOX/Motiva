@@ -1,20 +1,34 @@
 ///|
 pub(all) struct Circle {
   radius : Double
+  segments : Int
   style : ShapeStyle
 }
 
 ///|
 pub fn Circle::new(
   radius? : Double = 1.0,
+  segments? : Int = 8,
   style? : ShapeStyle = ShapeStyle::default(),
 ) -> Circle {
-  { radius, style }
+  { radius, segments, style }
+}
+
+///|
+pub fn Circle::arc(self : Circle) -> Arc {
+  Arc::new(
+    radius=self.radius,
+    start_angle=0.0,
+    angle=2.0 * @math.PI,
+    segments=self.segments,
+    closed=true,
+    style=self.style,
+  )
 }
 
 ///|
 pub fn Circle::path(self : Circle) -> Path2D {
-  Path2D::circle(radius=self.radius)
+  self.arc().path()
 }
 
 ///|

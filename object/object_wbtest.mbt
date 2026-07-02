@@ -20,6 +20,25 @@ test "circle lowers to path object" {
 }
 
 ///|
+test "arc path is open by default" {
+  let arc = Arc::new(radius=2.0, angle=@math.PI / 2.0, segments=2)
+  let path = arc.path()
+  assert_eq(path.commands.length(), 3)
+}
+
+///|
+test "circle path delegates to a closed full arc" {
+  let circle = Circle::new(radius=2.0)
+  let arc = circle.arc()
+  assert_close(arc.radius, 2.0)
+  assert_close(arc.start_angle, 0.0)
+  assert_close(arc.angle, 2.0 * @math.PI)
+  assert_eq(arc.segments, 8)
+  assert_true(arc.closed)
+  assert_eq(circle.path().commands.length(), arc.path().commands.length())
+}
+
+///|
 test "circle object bounds include object transform" {
   let circle = Circle::new(radius=2.0)
   let object = into_object(circle).with_transform(

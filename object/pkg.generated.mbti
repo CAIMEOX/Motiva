@@ -19,11 +19,25 @@ pub fn Aabb::transform(Self, Transform) -> Self
 pub fn Aabb::union(Self, Self) -> Self
 pub fn Aabb::width(Self) -> Double
 
-pub(all) struct Circle {
+pub(all) struct Arc {
   radius : Double
+  start_angle : Double
+  angle : Double
+  segments : Int
+  closed : Bool
   style : ShapeStyle
 }
-pub fn Circle::new(radius? : Double, style? : ShapeStyle) -> Self
+pub fn Arc::new(radius? : Double, start_angle? : Double, angle? : Double, segments? : Int, closed? : Bool, style? : ShapeStyle) -> Self
+pub fn Arc::path(Self) -> Path2D
+pub impl IntoObject for Arc
+
+pub(all) struct Circle {
+  radius : Double
+  segments : Int
+  style : ShapeStyle
+}
+pub fn Circle::arc(Self) -> Arc
+pub fn Circle::new(radius? : Double, segments? : Int, style? : ShapeStyle) -> Self
 pub fn Circle::path(Self) -> Path2D
 pub fn Circle::point_at_angle(Self, Double) -> Vec2
 pub impl IntoObject for Circle
@@ -53,7 +67,6 @@ pub(all) struct Path2D {
   commands : Array[PathCommand]
 }
 pub fn Path2D::bounds(Self) -> Aabb?
-pub fn Path2D::circle(radius~ : Double, segments? : Int) -> Self
 pub fn Path2D::close(Self) -> Unit
 pub fn Path2D::cubic_to(Self, Vec2, Vec2, Vec2) -> Unit
 pub fn Path2D::empty() -> Self
