@@ -6,10 +6,10 @@ pub(all) suberror PathEvalError {
 }
 
 ///|
-pub fn Path2D::eval(self : Path2D) -> Array[Vec2] raise PathEvalError {
-  let points : Array[Vec2] = []
-  let mut current : Vec2? = None
-  let mut subpath_start : Vec2? = None
+pub fn Path3D::eval(self : Path3D) -> Array[Vec3] raise PathEvalError {
+  let points : Array[Vec3] = []
+  let mut current : Vec3? = None
+  let mut subpath_start : Vec3? = None
   for command in self.commands {
     match (command, current, subpath_start) {
       (MoveTo(point), _, _) => {
@@ -38,7 +38,7 @@ pub fn Path2D::eval(self : Path2D) -> Array[Vec2] raise PathEvalError {
 }
 
 ///|
-fn append_line(points : Array[Vec2], start : Vec2, anchor : Vec2) -> Unit {
+fn append_line(points : Array[Vec3], start : Vec3, anchor : Vec3) -> Unit {
   append_cubic(
     points,
     start,
@@ -50,11 +50,11 @@ fn append_line(points : Array[Vec2], start : Vec2, anchor : Vec2) -> Unit {
 
 ///|
 fn append_cubic(
-  points : Array[Vec2],
-  anchor0 : Vec2,
-  handle1 : Vec2,
-  handle2 : Vec2,
-  anchor1 : Vec2,
+  points : Array[Vec3],
+  anchor0 : Vec3,
+  handle1 : Vec3,
+  handle2 : Vec3,
+  anchor1 : Vec3,
 ) -> Unit {
   points.push(anchor0)
   points.push(handle1)
@@ -63,11 +63,13 @@ fn append_cubic(
 }
 
 ///|
-fn lerp(start : Vec2, end : Vec2, t : Double) -> Vec2 {
+fn lerp(start : Vec3, end : Vec3, t : Double) -> Vec3 {
   start.add(end.sub(start).scale(t))
 }
 
 ///|
-fn points_nearly_equal(a : Vec2, b : Vec2) -> Bool {
-  Double::abs(a.x - b.x) < 0.000000001 && Double::abs(a.y - b.y) < 0.000000001
+fn points_nearly_equal(a : Vec3, b : Vec3) -> Bool {
+  Double::abs(a.x - b.x) < 0.000000001 &&
+  Double::abs(a.y - b.y) < 0.000000001 &&
+  Double::abs(a.z - b.z) < 0.000000001
 }

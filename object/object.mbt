@@ -10,7 +10,7 @@ pub(all) struct Object {
 pub(all) enum Node {
   Empty
   Group(Array[Object])
-  Path(Path2D, ShapeStyle)
+  Path(Path3D, ShapeStyle)
 }
 
 ///|
@@ -35,7 +35,7 @@ pub fn Object::group(children : Array[Object], id? : String = "") -> Object {
 
 ///|
 pub fn Object::path(
-  path : Path2D,
+  path : Path3D,
   style? : ShapeStyle = ShapeStyle::default(),
   id? : String = "",
 ) -> Object {

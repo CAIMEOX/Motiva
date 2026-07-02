@@ -21,27 +21,27 @@ pub fn Arc::new(
 }
 
 ///|
-pub fn Arc::path(self : Arc) -> Path2D {
+pub fn Arc::path(self : Arc) -> Path3D {
   let segment_count = if self.segments < 1 { 1 } else { self.segments }
-  let path = Path2D::empty()
+  let path = Path3D::empty()
   let delta = self.angle / Double::from_int(segment_count)
   for i in 0..<segment_count {
     let a0 = self.start_angle + delta * Double::from_int(i)
     let a1 = self.start_angle + delta * Double::from_int(i + 1)
-    let p0 = Vec2::new(
+    let p0 = Vec3::new(
       x=self.radius * @math.cos(a0),
       y=self.radius * @math.sin(a0),
     )
-    let p3 = Vec2::new(
+    let p3 = Vec3::new(
       x=self.radius * @math.cos(a1),
       y=self.radius * @math.sin(a1),
     )
     let k = 4.0 / 3.0 * @math.tan(delta / 4.0)
-    let h1 = Vec2::new(
+    let h1 = Vec3::new(
       x=p0.x + k * self.radius * (0.0 - @math.sin(a0)),
       y=p0.y + k * self.radius * @math.cos(a0),
     )
-    let h2 = Vec2::new(
+    let h2 = Vec3::new(
       x=p3.x - k * self.radius * (0.0 - @math.sin(a1)),
       y=p3.y - k * self.radius * @math.cos(a1),
     )

@@ -27,7 +27,7 @@ pub fn Circle::arc(self : Circle) -> Arc {
 }
 
 ///|
-pub fn Circle::path(self : Circle) -> Path2D {
+pub fn Circle::path(self : Circle) -> Path3D {
   self.arc().path()
 }
 
@@ -37,8 +37,8 @@ pub impl IntoObject for Circle with fn to_object(self, id? : String = "") -> Obj
 }
 
 ///|
-pub fn Circle::point_at_angle(self : Circle, angle : Double) -> Vec2 {
-  Vec2::new(x=self.radius * @math.cos(angle), y=self.radius * @math.sin(angle))
+pub fn Circle::point_at_angle(self : Circle, angle : Double) -> Vec3 {
+  Vec3::new(x=self.radius * @math.cos(angle), y=self.radius * @math.sin(angle))
 }
 
 ///|
@@ -56,13 +56,13 @@ pub fn Square::new(
 }
 
 ///|
-pub fn Square::path(self : Square) -> Path2D {
+pub fn Square::path(self : Square) -> Path3D {
   let half = self.side_length / 2.0
-  let path = Path2D::empty()
-  path.move_to(Vec2::new(x=0.0 - half, y=0.0 - half))
-  path.line_to(Vec2::new(x=half, y=0.0 - half))
-  path.line_to(Vec2::new(x=half, y=half))
-  path.line_to(Vec2::new(x=0.0 - half, y=half))
+  let path = Path3D::empty()
+  path.move_to(Vec3::new(x=0.0 - half, y=0.0 - half))
+  path.line_to(Vec3::new(x=half, y=0.0 - half))
+  path.line_to(Vec3::new(x=half, y=half))
+  path.line_to(Vec3::new(x=0.0 - half, y=half))
   path.close()
   path
 }
