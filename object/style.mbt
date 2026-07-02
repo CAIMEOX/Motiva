@@ -1,0 +1,70 @@
+///|
+pub(all) struct Rgba {
+  r : Double
+  g : Double
+  b : Double
+  a : Double
+}
+
+///|
+pub fn Rgba::new(r~ : Double, g~ : Double, b~ : Double, a~ : Double) -> Rgba {
+  { r, g, b, a }
+}
+
+///|
+pub fn Rgba::rgb(r~ : Double, g~ : Double, b~ : Double) -> Rgba {
+  { r, g, b, a: 1.0 }
+}
+
+///|
+pub fn Rgba::white() -> Rgba {
+  Rgba::rgb(r=1.0, g=1.0, b=1.0)
+}
+
+///|
+pub fn Rgba::black() -> Rgba {
+  Rgba::rgb(r=0.0, g=0.0, b=0.0)
+}
+
+///|
+pub fn Rgba::red() -> Rgba {
+  Rgba::rgb(r=1.0, g=0.0, b=0.0)
+}
+
+///|
+pub(all) struct ShapeStyle {
+  fill : Rgba?
+  fill_opacity : Double
+  stroke : Rgba?
+  stroke_opacity : Double
+  stroke_width : Double
+}
+
+///|
+pub fn ShapeStyle::new(
+  fill? : Rgba,
+  fill_opacity? : Double = 0.0,
+  stroke? : Rgba,
+  stroke_opacity? : Double = 1.0,
+  stroke_width? : Double = 4.0,
+) -> ShapeStyle {
+  { fill, fill_opacity, stroke, stroke_opacity, stroke_width }
+}
+
+///|
+pub fn ShapeStyle::stroked(
+  color~ : Rgba,
+  stroke_width? : Double = 4.0,
+) -> ShapeStyle {
+  ShapeStyle::new(stroke=color, stroke_width~)
+}
+
+///|
+pub fn ShapeStyle::filled(color~ : Rgba) -> ShapeStyle {
+  ShapeStyle::new(fill=color, fill_opacity=1.0, stroke=color)
+}
+
+///|
+pub fn ShapeStyle::default() -> ShapeStyle {
+  ShapeStyle::stroked(color=Rgba::red())
+}

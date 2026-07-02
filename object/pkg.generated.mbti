@@ -1,0 +1,128 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "caimeo/animoon/object"
+
+// Values
+pub fn[T : IntoObject] into_object(T, id? : String) -> Object
+
+// Errors
+
+// Types and methods
+pub(all) struct Aabb {
+  min : Vec2
+  max : Vec2
+}
+pub fn Aabb::height(Self) -> Double
+pub fn Aabb::include_point(Self, Vec2) -> Self
+pub fn Aabb::new(min~ : Vec2, max~ : Vec2) -> Self
+pub fn Aabb::point(Vec2) -> Self
+pub fn Aabb::transform(Self, Transform) -> Self
+pub fn Aabb::union(Self, Self) -> Self
+pub fn Aabb::width(Self) -> Double
+
+pub(all) struct Circle {
+  radius : Double
+  style : ShapeStyle
+}
+pub fn Circle::new(radius? : Double, style? : ShapeStyle) -> Self
+pub fn Circle::path(Self) -> Path2D
+pub fn Circle::point_at_angle(Self, Double) -> Vec2
+pub impl IntoObject for Circle
+
+pub(all) enum Node {
+  Empty
+  Group(Array[Object])
+  Path(Path2D, ShapeStyle)
+}
+pub fn Node::bounds(Self) -> Aabb?
+
+pub(all) struct Object {
+  id : String
+  transform : Transform
+  z_index : Double
+  node : Node
+}
+pub fn Object::bounds(Self) -> Aabb?
+pub fn Object::empty(id? : String) -> Self
+pub fn Object::group(Array[Self], id? : String) -> Self
+pub fn Object::new(node~ : Node, id? : String, transform? : Transform, z_index? : Double) -> Self
+pub fn Object::path(Path2D, style? : ShapeStyle, id? : String) -> Self
+pub fn Object::with_transform(Self, Transform) -> Self
+pub fn Object::with_z_index(Self, Double) -> Self
+
+pub(all) struct Path2D {
+  commands : Array[PathCommand]
+}
+pub fn Path2D::bounds(Self) -> Aabb?
+pub fn Path2D::circle(radius~ : Double, segments? : Int) -> Self
+pub fn Path2D::close(Self) -> Unit
+pub fn Path2D::cubic_to(Self, Vec2, Vec2, Vec2) -> Unit
+pub fn Path2D::empty() -> Self
+pub fn Path2D::line_to(Self, Vec2) -> Unit
+pub fn Path2D::move_to(Self, Vec2) -> Unit
+
+pub(all) enum PathCommand {
+  MoveTo(Vec2)
+  LineTo(Vec2)
+  CubicTo(Vec2, Vec2, Vec2)
+  Close
+}
+
+pub(all) struct Rgba {
+  r : Double
+  g : Double
+  b : Double
+  a : Double
+}
+pub fn Rgba::black() -> Self
+pub fn Rgba::new(r~ : Double, g~ : Double, b~ : Double, a~ : Double) -> Self
+pub fn Rgba::red() -> Self
+pub fn Rgba::rgb(r~ : Double, g~ : Double, b~ : Double) -> Self
+pub fn Rgba::white() -> Self
+
+pub(all) struct ShapeStyle {
+  fill : Rgba?
+  fill_opacity : Double
+  stroke : Rgba?
+  stroke_opacity : Double
+  stroke_width : Double
+}
+pub fn ShapeStyle::default() -> Self
+pub fn ShapeStyle::filled(color~ : Rgba) -> Self
+pub fn ShapeStyle::new(fill? : Rgba, fill_opacity? : Double, stroke? : Rgba, stroke_opacity? : Double, stroke_width? : Double) -> Self
+pub fn ShapeStyle::stroked(color~ : Rgba, stroke_width? : Double) -> Self
+
+pub(all) struct Transform {
+  m00 : Double
+  m01 : Double
+  m02 : Double
+  m10 : Double
+  m11 : Double
+  m12 : Double
+}
+pub fn Transform::apply_point(Self, Vec2) -> Vec2
+pub fn Transform::apply_vec(Self, Vec2) -> Vec2
+pub fn Transform::identity() -> Self
+pub fn Transform::rotate(angle~ : Double) -> Self
+pub fn Transform::scale(sx~ : Double, sy~ : Double) -> Self
+pub fn Transform::then(Self, Self) -> Self
+pub fn Transform::translate(Vec2) -> Self
+
+pub(all) struct Vec2 {
+  x : Double
+  y : Double
+}
+pub fn Vec2::add(Self, Self) -> Self
+pub fn Vec2::max(Self, Self) -> Self
+pub fn Vec2::min(Self, Self) -> Self
+pub fn Vec2::new(x~ : Double, y~ : Double) -> Self
+pub fn Vec2::scale(Self, Double) -> Self
+pub fn Vec2::sub(Self, Self) -> Self
+pub fn Vec2::zero() -> Self
+
+// Type aliases
+
+// Traits
+pub trait IntoObject {
+  fn to_object(Self, id? : String) -> Object
+}
+

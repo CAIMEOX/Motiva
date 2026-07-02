@@ -1,0 +1,70 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "caimeo/animoon"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn version() -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct Animation {
+  target : String
+  duration : Double
+  easing : Easing
+} derive(ToJson, @debug.Debug)
+pub fn Animation::fade_in(target~ : String, duration~ : Double) -> Self
+pub fn Animation::new(target~ : String, duration~ : Double, easing? : Easing) -> Self
+
+pub(all) enum Easing {
+  Linear
+} derive(ToJson, @debug.Debug)
+pub fn Easing::sample(Self, Double) -> Double
+
+pub(all) enum Primitive {
+  Circle(center~ : Vec2, radius~ : Double, color~ : Rgba)
+  Text(content~ : String, position~ : Vec2, color~ : Rgba)
+} derive(ToJson, @debug.Debug)
+pub fn Primitive::circle(center~ : Vec2, radius~ : Double, color~ : Rgba) -> Self
+pub fn Primitive::text(content~ : String, position~ : Vec2, color~ : Rgba) -> Self
+
+pub(all) struct Rgba {
+  r : Double
+  g : Double
+  b : Double
+  a : Double
+} derive(ToJson, @debug.Debug)
+pub fn Rgba::black() -> Self
+pub fn Rgba::new(r~ : Double, g~ : Double, b~ : Double, a~ : Double) -> Self
+pub fn Rgba::rgb(r~ : Double, g~ : Double, b~ : Double) -> Self
+pub fn Rgba::white() -> Self
+
+pub(all) struct Scene {
+  name : String
+  objects : Array[Primitive]
+  animations : Array[Animation]
+} derive(ToJson, @debug.Debug)
+pub fn Scene::add(Self, Primitive) -> Self
+pub fn Scene::animate(Self, Animation) -> Self
+pub fn Scene::animation_count(Self) -> Int
+pub fn Scene::new(name~ : String) -> Self
+pub fn Scene::object_count(Self) -> Int
+
+pub(all) struct Vec2 {
+  x : Double
+  y : Double
+} derive(ToJson, @debug.Debug)
+pub fn Vec2::add(Self, Self) -> Self
+pub fn Vec2::lerp(Self, Self, Double) -> Self
+pub fn Vec2::new(x~ : Double, y~ : Double) -> Self
+pub fn Vec2::scale(Self, Double) -> Self
+pub fn Vec2::sub(Self, Self) -> Self
+pub fn Vec2::zero() -> Self
+
+// Type aliases
+
+// Traits
+
