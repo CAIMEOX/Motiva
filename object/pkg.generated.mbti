@@ -104,6 +104,14 @@ pub fn ShapeStyle::filled(color~ : Rgba) -> Self
 pub fn ShapeStyle::new(fill? : Rgba, fill_opacity? : Double, stroke? : Rgba, stroke_opacity? : Double, stroke_width? : Double) -> Self
 pub fn ShapeStyle::stroked(color~ : Rgba, stroke_width? : Double) -> Self
 
+pub(all) struct Square {
+  side_length : Double
+  style : ShapeStyle
+}
+pub fn Square::new(side_length? : Double, style? : ShapeStyle) -> Self
+pub fn Square::path(Self) -> Path2D
+pub impl IntoObject for Square
+
 pub(all) struct Transform {
   m00 : Double
   m01 : Double

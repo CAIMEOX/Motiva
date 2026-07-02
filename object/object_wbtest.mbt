@@ -60,3 +60,34 @@ test "circle point_at_angle uses local circle geometry" {
   assert_close(point.x, 0.0)
   assert_close(point.y, 2.0)
 }
+
+///|
+test "square lowers to path object" {
+  let square = Square::new(side_length=4.0)
+  let object = into_object(square, id="square")
+  guard object.node is Path(path, style) else {
+    fail("Square should lower to Node::Path")
+  }
+  assert_eq(path.commands.length(), 5)
+  guard style.stroke is Some(color) else {
+    fail("Square should have a default stroke color")
+  }
+  assert_close(color.r, 1.0)
+  assert_close(color.g, 0.0)
+  assert_close(color.b, 0.0)
+}
+
+///|
+test "square object bounds include object transform" {
+  let square = Square::new(side_length=4.0)
+  let object = into_object(square).with_transform(
+    Transform::translate(Vec2::new(x=1.0, y=-1.0)),
+  )
+  guard object.bounds() is Some(bounds) else {
+    fail("Square should have bounds")
+  }
+  assert_close(bounds.min.x, -1.0)
+  assert_close(bounds.max.x, 3.0)
+  assert_close(bounds.min.y, -3.0)
+  assert_close(bounds.max.y, 1.0)
+}
