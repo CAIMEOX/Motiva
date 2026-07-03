@@ -1,0 +1,69 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "caimeo/animoon/scene"
+
+import {
+  "caimeo/animoon/object",
+}
+
+// Values
+
+// Errors
+pub(all) suberror SceneError {
+  UnknownObject(ObjectId)
+}
+
+// Types and methods
+pub(all) struct ObjectId {
+  value : Int
+} derive(Eq, Hash)
+pub fn ObjectId::value(Self) -> Int
+
+pub(all) enum ObjectState {
+  Allocated
+  Visible
+  Removed
+} derive(Eq)
+
+pub(all) struct Scene {
+  mut next_id : Int
+  objects : Map[ObjectId, SceneObject]
+  mut draw_order : Array[ObjectId]
+  mut foreground : Array[ObjectId]
+  mut time : Double
+  config : SceneConfig
+}
+pub fn[T : @object.IntoObject] Scene::add(Self, T, id? : String) -> ObjectId
+pub fn[T : @object.IntoObject] Scene::add_foreground(Self, T, id? : String) -> ObjectId
+pub fn Scene::clear(Self) -> Unit
+pub fn Scene::foreground_objects(Self) -> Array[ObjectId]
+pub fn Scene::get(Self, ObjectId) -> @object.Object?
+pub fn Scene::is_visible(Self, ObjectId) -> Bool
+pub fn Scene::new(config? : SceneConfig) -> Self
+pub fn[T : @object.IntoObject] Scene::object(Self, T, id? : String) -> ObjectId
+pub fn Scene::object_count(Self) -> Int
+pub fn Scene::remove(Self, ObjectId) -> Unit raise SceneError
+pub fn Scene::remove_foreground(Self, ObjectId) -> Unit raise SceneError
+pub fn[T : @object.IntoObject] Scene::replace(Self, ObjectId, T, name? : String) -> Unit raise SceneError
+pub fn Scene::show(Self, ObjectId) -> Unit raise SceneError
+pub fn Scene::show_foreground(Self, ObjectId) -> Unit raise SceneError
+pub fn Scene::state(Self, ObjectId) -> ObjectState?
+pub fn Scene::visible_count(Self) -> Int
+pub fn Scene::visible_objects(Self) -> Array[ObjectId]
+
+pub(all) struct SceneConfig {
+  frame_rate : Double
+  always_update_objects : Bool
+}
+pub fn SceneConfig::default() -> Self
+
+pub(all) struct SceneObject {
+  object : @object.Object
+  state : ObjectState
+  parent : ObjectId?
+  children : Array[ObjectId]
+}
+
+// Type aliases
+
+// Traits
+
