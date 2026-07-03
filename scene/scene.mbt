@@ -4,6 +4,11 @@ pub(all) struct ObjectId {
 } derive(Eq, Hash)
 
 ///|
+pub fn ObjectId::value(self : ObjectId) -> Int {
+  self.value
+}
+
+///|
 pub(all) enum ObjectState {
   Allocated
   Visible
@@ -126,8 +131,7 @@ pub fn[T : @object.IntoObject] Scene::replace(
   x : T,
   name? : String = "",
 ) -> Unit raise SceneError {
-  let scene_object = self.require_object(id)
-  self.objects[id] = { ..scene_object, object: @object.into_object(x, id=name) }
+  self.replace_object(id, x.to_object(id=name))
 }
 
 ///|
@@ -199,6 +203,16 @@ fn Scene::require_object(
     None => raise UnknownObject(id)
     Some(scene_object) => scene_object
   }
+}
+
+///|
+fn Scene::replace_object(
+  self : Scene,
+  id : ObjectId,
+  object : @object.Object,
+) -> Unit raise SceneError {
+  let scene_object = self.require_object(id)
+  self.objects[id] = { ..scene_object, object, }
 }
 
 ///|

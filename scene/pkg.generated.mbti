@@ -6,6 +6,7 @@ import {
 }
 
 // Values
+pub fn[T : IntoAnimation] into_animation(T) -> Animation
 
 // Errors
 pub(all) suberror SceneError {
@@ -13,10 +14,67 @@ pub(all) suberror SceneError {
 }
 
 // Types and methods
+pub(all) struct Animation {
+  kind : AnimationKind
+  timing : Timing
+}
+pub fn Animation::apply_ops(ObjectId, Array[ObjectOp], run_time? : Double) -> Self
+pub fn Animation::create(ObjectId, run_time? : Double) -> Self
+pub fn Animation::fade_in(ObjectId, run_time? : Double) -> Self
+pub fn Animation::fade_out(ObjectId, run_time? : Double) -> Self
+pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
+pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, name? : String) -> Self
+pub fn Animation::wait(Double) -> Self
+pub fn Animation::with_run_time(Self, Double) -> Self
+pub impl IntoAnimation for Animation
+
+pub(all) struct AnimationBuilder {
+  id : ObjectId
+  ops : Array[ObjectOp]
+  timing : Timing
+}
+pub fn AnimationBuilder::rotate(Self, angle~ : Double) -> Self
+pub fn AnimationBuilder::rotate_x(Self, angle~ : Double) -> Self
+pub fn AnimationBuilder::rotate_y(Self, angle~ : Double) -> Self
+pub fn AnimationBuilder::rotate_z(Self, angle~ : Double) -> Self
+pub fn AnimationBuilder::scale(Self, sx~ : Double, sy~ : Double, sz? : Double) -> Self
+pub fn AnimationBuilder::set_transform(Self, @object.Transform) -> Self
+pub fn AnimationBuilder::set_z_index(Self, Double) -> Self
+pub fn AnimationBuilder::shift(Self, @object.Vec3) -> Self
+pub fn AnimationBuilder::target(Self, @object.Object) -> @object.Object
+pub fn AnimationBuilder::to_animation(Self) -> Animation
+pub fn AnimationBuilder::with_run_time(Self, Double) -> Self
+pub impl IntoAnimation for AnimationBuilder
+
+pub(all) enum AnimationKind {
+  Wait
+  Create(ObjectId)
+  FadeIn(ObjectId)
+  FadeOut(ObjectId)
+  Transform(ObjectId, @object.Object)
+  ApplyOps(ObjectId, Array[ObjectOp])
+}
+
 pub(all) struct ObjectId {
   value : Int
 } derive(Eq, Hash)
+pub fn ObjectId::animate(Self, run_time? : Double) -> AnimationBuilder
 pub fn ObjectId::value(Self) -> Int
+
+pub(all) enum ObjectOp {
+  ApplyTransform(@object.Transform)
+  SetTransform(@object.Transform)
+  SetZIndex(Double)
+}
+pub fn ObjectOp::apply(Self, @object.Object) -> @object.Object
+pub fn ObjectOp::rotate(angle~ : Double) -> Self
+pub fn ObjectOp::rotate_x(angle~ : Double) -> Self
+pub fn ObjectOp::rotate_y(angle~ : Double) -> Self
+pub fn ObjectOp::rotate_z(angle~ : Double) -> Self
+pub fn ObjectOp::scale(sx~ : Double, sy~ : Double, sz? : Double) -> Self
+pub fn ObjectOp::set_transform(@object.Transform) -> Self
+pub fn ObjectOp::set_z_index(Double) -> Self
+pub fn ObjectOp::shift(@object.Vec3) -> Self
 
 pub(all) enum ObjectState {
   Allocated
@@ -41,12 +99,14 @@ pub fn Scene::is_visible(Self, ObjectId) -> Bool
 pub fn Scene::new(config? : SceneConfig) -> Self
 pub fn[T : @object.IntoObject] Scene::object(Self, T, id? : String) -> ObjectId
 pub fn Scene::object_count(Self) -> Int
+pub fn[T : IntoAnimation] Scene::play(Self, Array[T]) -> Unit raise SceneError
 pub fn Scene::remove(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::remove_foreground(Self, ObjectId) -> Unit raise SceneError
 pub fn[T : @object.IntoObject] Scene::replace(Self, ObjectId, T, name? : String) -> Unit raise SceneError
 pub fn Scene::show(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::show_foreground(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::state(Self, ObjectId) -> ObjectState?
+pub fn Scene::time(Self) -> Double
 pub fn Scene::visible_count(Self) -> Int
 pub fn Scene::visible_objects(Self) -> Array[ObjectId]
 
@@ -63,7 +123,15 @@ pub(all) struct SceneObject {
   children : Array[ObjectId]
 }
 
+pub(all) struct Timing {
+  run_time : Double
+}
+pub fn Timing::new(run_time? : Double) -> Self
+
 // Type aliases
 
 // Traits
+pub trait IntoAnimation {
+  fn to_animation(Self) -> Animation
+}
 
