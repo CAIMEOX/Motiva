@@ -22,8 +22,16 @@ pub(all) struct SceneConfig {
 }
 
 ///|
+pub fn SceneConfig::new(
+  frame_rate? : Double = 60.0,
+  always_update_objects? : Bool = false,
+) -> SceneConfig {
+  { frame_rate, always_update_objects }
+}
+
+///|
 pub fn SceneConfig::default() -> SceneConfig {
-  { frame_rate: 60.0, always_update_objects: false }
+  SceneConfig::new()
 }
 
 ///|
@@ -37,6 +45,15 @@ pub(all) struct SceneObject {
 ///|
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  EmptyPlay
+  InvalidRunTime(Double)
+  InvalidFrameRate(Double)
+  PlayWriteFailed(Error)
+}
+
+///|
+pub(all) struct PlayWriter {
+  run : (Scene, Array[Animation]) -> Unit raise SceneError
 }
 
 ///|
@@ -47,11 +64,41 @@ pub(all) struct Scene {
   mut foreground : Array[ObjectId]
   mut time : Double
   config : SceneConfig
+  mut play_writer : PlayWriter?
 }
 
 ///|
 pub fn Scene::new(config? : SceneConfig = SceneConfig::default()) -> Scene {
-  { next_id: 0, objects: {}, draw_order: [], foreground: [], time: 0.0, config }
+  {
+    next_id: 0,
+    objects: {},
+    draw_order: [],
+    foreground: [],
+    time: 0.0,
+    config,
+    play_writer: None,
+  }
+}
+
+///|
+pub fn PlayWriter::new(
+  run : (Scene, Array[Animation]) -> Unit raise SceneError,
+) -> PlayWriter {
+  { run, }
+}
+
+///|
+pub fn PlayWriter::write(
+  self : PlayWriter,
+  scene : Scene,
+  animations : Array[Animation],
+) -> Unit raise SceneError {
+  (self.run)(scene, animations)
+}
+
+///|
+pub fn Scene::set_play_writer(self : Scene, writer : PlayWriter?) -> Unit {
+  self.play_writer = writer
 }
 
 ///|

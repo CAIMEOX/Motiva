@@ -9,7 +9,7 @@
 //   "moonbitlang/x@0.4.6",
 // }
 
-name = "caimeo/animoon"
+name = "CAIMEOX/Motiva"
 
 version = "0.1.0"
 
@@ -22,3 +22,8 @@ license = "Apache-2.0"
 keywords = [ "animation", "manim", "graphics", "timeline" ]
 
 description = "A MoonBit animation engine inspired by Manim."
+
+import {
+  "CAIMEOX/cairoon@0.1.0",
+  "moonbitlang/async@0.19.1",
+}
