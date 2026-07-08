@@ -6,3 +6,5 @@ target
 .moonagent/
 .repos/
 *.log
+output/*
+!output/.gitkeep

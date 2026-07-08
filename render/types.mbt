@@ -1,6 +1,7 @@
 ///|
 pub(all) suberror RenderError {
   Cairo(@cairoon.CairoError)
+  Ffmpeg(@ffmpeg.FfmpegError)
   Scene(@scene.SceneError)
   MissingObject(@scene.ObjectId)
   OutputFrameCountMismatch(expected~ : Int, actual~ : Int)

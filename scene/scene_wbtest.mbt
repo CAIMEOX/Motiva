@@ -132,3 +132,26 @@ test "unknown object operations are typed errors" {
   }
   assert_object_id(id, 99)
 }
+
+///|
+test "play writer intercepts scene play and can drive immediate playback" {
+  let scene = Scene::new(config=SceneConfig::new(frame_rate=4.0))
+  let calls : Array[Int] = []
+  let writer = PlayWriter::new((scene, animations) => {
+    calls.push(animations.length())
+    scene.play_immediate(animations, config=PlayConfig::image_sequence())
+  })
+  scene.set_play_writer(Some(writer))
+  let square = scene.object(@object.Square::new())
+  scene.play([
+    square.animate(run_time=1.0).shift(@object.Vec3::new(x=3.0, y=0.0)),
+  ])
+  assert_eq(calls.length(), 1)
+  assert_eq(calls[0], 1)
+  assert_true(scene.is_visible(square))
+  guard scene.get(square) is Some(object) else {
+    fail("writer playback should leave final object in scene")
+  }
+  assert_true(Double::abs(object.transform.m03 - 3.0) < 0.000001)
+  assert_true(Double::abs(scene.time() - 1.0) < 0.000001)
+}
