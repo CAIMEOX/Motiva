@@ -11,6 +11,9 @@ pub fn[T : IntoAnimation] into_animation(T) -> Animation
 // Errors
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  EmptyPlay
+  InvalidRunTime(Double)
+  InvalidFrameRate(Double)
 }
 
 // Types and methods
@@ -55,6 +58,13 @@ pub(all) enum AnimationKind {
   ApplyOps(ObjectId, Array[ObjectOp])
 }
 
+pub(all) struct FrameTime {
+  frame_index : Int
+  play_time : Double
+  absolute_time : Double
+  dt : Double
+}
+
 pub(all) struct ObjectId {
   value : Int
 } derive(Eq, Hash)
@@ -82,6 +92,27 @@ pub(all) enum ObjectState {
   Removed
 } derive(Eq)
 
+pub(all) struct PlayConfig {
+  include_start_frame : Bool
+  include_end_frame : Bool
+}
+pub fn PlayConfig::default() -> Self
+pub fn PlayConfig::image_sequence() -> Self
+pub fn PlayConfig::new(include_start_frame? : Bool, include_end_frame? : Bool) -> Self
+
+pub struct PlayPlan {
+  // private fields
+}
+pub fn PlayPlan::affected_ids(Self) -> Array[ObjectId]
+pub fn PlayPlan::apply_frame(Self, Scene, FrameTime) -> Unit raise SceneError
+pub fn PlayPlan::begin(Self, Scene) -> Unit raise SceneError
+pub fn PlayPlan::finish(Self, Scene) -> Unit raise SceneError
+pub fn PlayPlan::frame_count(Self) -> Int
+pub fn PlayPlan::frame_rate(Self) -> Double
+pub fn PlayPlan::frame_times(Self) -> Array[FrameTime]
+pub fn PlayPlan::run_time(Self) -> Double
+pub fn PlayPlan::start_time(Self) -> Double
+
 pub(all) struct Scene {
   mut next_id : Int
   objects : Map[ObjectId, SceneObject]
@@ -93,6 +124,7 @@ pub(all) struct Scene {
 pub fn[T : @object.IntoObject] Scene::add(Self, T, id? : String) -> ObjectId
 pub fn[T : @object.IntoObject] Scene::add_foreground(Self, T, id? : String) -> ObjectId
 pub fn Scene::clear(Self) -> Unit
+pub fn[T : IntoAnimation] Scene::compile_play_plan(Self, Array[T], config? : PlayConfig) -> PlayPlan raise SceneError
 pub fn Scene::foreground_objects(Self) -> Array[ObjectId]
 pub fn Scene::get(Self, ObjectId) -> @object.Object?
 pub fn Scene::is_visible(Self, ObjectId) -> Bool
@@ -115,6 +147,7 @@ pub(all) struct SceneConfig {
   always_update_objects : Bool
 }
 pub fn SceneConfig::default() -> Self
+pub fn SceneConfig::new(frame_rate? : Double, always_update_objects? : Bool) -> Self
 
 pub(all) struct SceneObject {
   object : @object.Object

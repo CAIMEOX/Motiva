@@ -22,8 +22,16 @@ pub(all) struct SceneConfig {
 }
 
 ///|
+pub fn SceneConfig::new(
+  frame_rate? : Double = 60.0,
+  always_update_objects? : Bool = false,
+) -> SceneConfig {
+  { frame_rate, always_update_objects }
+}
+
+///|
 pub fn SceneConfig::default() -> SceneConfig {
-  { frame_rate: 60.0, always_update_objects: false }
+  SceneConfig::new()
 }
 
 ///|
@@ -37,6 +45,9 @@ pub(all) struct SceneObject {
 ///|
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  EmptyPlay
+  InvalidRunTime(Double)
+  InvalidFrameRate(Double)
 }
 
 ///|

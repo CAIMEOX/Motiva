@@ -1,7 +1,9 @@
 ///|
 pub(all) suberror RenderError {
   Cairo(@cairoon.CairoError)
+  Scene(@scene.SceneError)
   MissingObject(@scene.ObjectId)
+  OutputFrameCountMismatch(expected~ : Int, actual~ : Int)
 }
 
 ///|
