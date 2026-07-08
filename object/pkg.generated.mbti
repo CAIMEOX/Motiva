@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "caimeo/animoon/object"
+package "CAIMEOX/Motiva/object"
 
 // Values
 pub fn[T : IntoObject] into_object(T, id? : String) -> Object
@@ -93,9 +93,11 @@ pub fn PathBuffer3D::is_empty(Self) -> Bool
 pub fn PathBuffer3D::lerp(Self, Self, Double) -> Self
 pub fn PathBuffer3D::map_points(Self, (Vec3) -> Vec3) -> Self
 pub fn PathBuffer3D::normalize_pair(Self, Self) -> (Self, Self)
+pub fn PathBuffer3D::partial(Self, start~ : Double, end~ : Double) -> Self
 pub fn PathBuffer3D::point(Self, Int) -> Vec3?
 pub fn PathBuffer3D::point_count(Self) -> Int
 pub fn PathBuffer3D::points(Self) -> Array[Vec3]
+pub fn PathBuffer3D::prefix(Self, Double) -> Self
 pub fn PathBuffer3D::subpaths(Self) -> Array[SubpathSpan]
 pub fn PathBuffer3D::to_path(Self) -> Path3D
 

@@ -171,9 +171,9 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
         FramePatch::put(id, start),
         FramePatch::ensure_visible(id),
       ])
-    ActiveReveal(id, source~, ..) =>
+    ActiveReveal(id, source~, mode~) =>
       FramePatch::all([
-        FramePatch::put(id, source),
+        FramePatch::put(id, sample_reveal(source, mode, 0.0)),
         FramePatch::ensure_visible(id),
       ])
     ActiveRemoval(id, source~, ..) =>
@@ -251,10 +251,44 @@ fn ActiveAnimation::alpha_at_time(
 fn sample_reveal(
   source : @object.Object,
   mode : RevealMode,
-  _alpha : Double,
+  alpha : Double,
 ) -> @object.Object {
   match mode {
-    CreateReveal | FadeInReveal => source
+    CreateReveal => sample_create_object(source, alpha)
+    FadeInReveal => source
+  }
+}
+
+///|
+fn sample_create_object(
+  source : @object.Object,
+  alpha : Double,
+) -> @object.Object {
+  @object.Object::new(
+    node=sample_create_node(source.node, alpha),
+    id=source.id,
+    transform=source.transform,
+    z_index=source.z_index,
+  )
+}
+
+///|
+fn sample_create_node(source : @object.Node, alpha : Double) -> @object.Node {
+  match source {
+    Empty => Empty
+    Group(children) =>
+      Group(children.map(child => sample_create_object(child, alpha)))
+    Path(path, style) => Path(sample_create_path(path, alpha), style)
+  }
+}
+
+///|
+fn sample_create_path(
+  source : @object.Path3D,
+  alpha : Double,
+) -> @object.Path3D {
+  source.eval().prefix(alpha).to_path() catch {
+    _ => choose_endpoint(@object.Path3D::empty(), source, alpha)
   }
 }
 

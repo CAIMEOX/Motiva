@@ -174,6 +174,39 @@ test "point buffer maps every 3d point" {
 }
 
 ///|
+test "point buffer prefix clips a path without closing it early" {
+  let buffer = Square::new(side_length=4.0).path().eval()
+  let empty = buffer.prefix(0.0)
+  assert_eq(empty.curve_count(), 0)
+  assert_eq(empty.subpaths().length(), 0)
+  let half = buffer.prefix(0.5)
+  assert_eq(half.curve_count(), 2)
+  guard half.subpaths().get(0) is Some(half_span) else {
+    fail("half prefix should keep one subpath")
+  }
+  assert_eq(half_span.curve_count, 2)
+  assert_true(!half_span.closed)
+  assert_buffer_point_close(half, 0, Vec3::new(x=-2.0, y=-2.0))
+  assert_buffer_point_close(half, 7, Vec3::new(x=2.0, y=2.0))
+  let full = buffer.prefix(1.0)
+  guard full.subpaths().get(0) is Some(full_span) else {
+    fail("full prefix should keep one subpath")
+  }
+  assert_true(full_span.closed)
+}
+
+///|
+test "point buffer partial clips inside a cubic curve" {
+  let path = Path3D::empty()
+  path.move_to(Vec3::zero())
+  path.line_to(Vec3::new(x=4.0, y=0.0))
+  let partial = path.eval().partial(start=0.25, end=0.75)
+  assert_eq(partial.curve_count(), 1)
+  assert_buffer_point_close(partial, 0, Vec3::new(x=1.0, y=0.0))
+  assert_buffer_point_close(partial, 3, Vec3::new(x=3.0, y=0.0))
+}
+
+///|
 test "point buffer from_points rejects invalid cubic point count" {
   let result = try
     PathBuffer3D::from_points([Vec3::zero(), Vec3::new(x=1.0, y=0.0)])

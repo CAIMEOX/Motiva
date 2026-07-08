@@ -1,8 +1,8 @@
 import {
   "CAIMEOX/cairoon",
-  "caimeo/animoon/ffmpeg",
-  "caimeo/animoon/object",
-  "caimeo/animoon/scene",
+  "CAIMEOX/Motiva/ffmpeg",
+  "CAIMEOX/Motiva/object",
+  "CAIMEOX/Motiva/scene",
 }
 
 import {

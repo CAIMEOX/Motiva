@@ -1,7 +1,7 @@
 import {
-  "caimeo/animoon/object",
-  "caimeo/animoon/render",
-  "caimeo/animoon/scene",
+  "CAIMEOX/Motiva/object",
+  "CAIMEOX/Motiva/render",
+  "CAIMEOX/Motiva/scene",
   "moonbitlang/async",
 }
 

@@ -9,8 +9,8 @@ using @scene {type Animation, type Scene, type SceneConfig}
 
 ///|
 async fn animate() -> Unit {
-  let frame_prefix = "circle_to_square_720p60"
-  let movie_path = "output/circle_to_square_720p60.mp4"
+  let frame_prefix = "create_circle_to_square_720p60"
+  let movie_path = "output/create_circle_to_square_720p60.mp4"
   let scene = Scene::new(config=SceneConfig::new(frame_rate=60))
   let writer = MovieWriter::mp4(
     renderer=CairoRenderer::new(
@@ -30,6 +30,7 @@ async fn animate() -> Unit {
   )
   writer.attach(scene)
   let circle = scene.object(Circle::new(radius=1.2))
+  scene.play([Animation::create(circle, run_time=1.0)])
   scene.play([
     Animation::transform(circle, Square::new(side_length=2.4), run_time=1.0),
   ])

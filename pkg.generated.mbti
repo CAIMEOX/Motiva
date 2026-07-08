@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "caimeo/animoon"
+package "CAIMEOX/Motiva"
 
 import {
   "moonbitlang/core/debug",
@@ -67,4 +67,3 @@ pub fn Vec2::zero() -> Self
 // Type aliases
 
 // Traits
-

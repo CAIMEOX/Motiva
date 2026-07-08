@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "caimeo/animoon/scene"
+package "CAIMEOX/Motiva/scene"
 
 import {
-  "caimeo/animoon/object",
+  "CAIMEOX/Motiva/object",
 }
 
 // Values

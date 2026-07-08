@@ -85,6 +85,46 @@ pub fn PathBuffer3D::map_points(
 }
 
 ///|
+pub fn PathBuffer3D::prefix(
+  self : PathBuffer3D,
+  alpha : Double,
+) -> PathBuffer3D {
+  self.partial(start=0.0, end=alpha)
+}
+
+///|
+pub fn PathBuffer3D::partial(
+  self : PathBuffer3D,
+  start~ : Double,
+  end~ : Double,
+) -> PathBuffer3D {
+  let start = clamp_unit(start)
+  let end = clamp_unit(end)
+  if start >= end || self.is_empty() {
+    PathBuffer3D::unsafe_new([], [])
+  } else if start <= 0.0 && end >= 1.0 {
+    PathBuffer3D::unsafe_new(self.points, self.subpaths)
+  } else {
+    let points : Array[Vec3] = []
+    let subpaths : Array[SubpathSpan] = []
+    let curve_count = self.curve_count().to_double()
+    let start_curve = start * curve_count
+    let end_curve = end * curve_count
+    for span in self.subpaths {
+      append_partial_span(
+        points,
+        subpaths,
+        self.points,
+        span,
+        start_curve,
+        end_curve,
+      )
+    }
+    PathBuffer3D::unsafe_new(points, subpaths)
+  }
+}
+
+///|
 pub fn PathBuffer3D::normalize_pair(
   self : PathBuffer3D,
   other : PathBuffer3D,
@@ -261,6 +301,68 @@ fn append_cubic(
 }
 
 ///|
+fn append_partial_span(
+  output_points : Array[Vec3],
+  output_subpaths : Array[SubpathSpan],
+  source_points : Array[Vec3],
+  span : SubpathSpan,
+  start_curve : Double,
+  end_curve : Double,
+) -> Unit {
+  let output_start_curve = output_points.length() / 4
+  let mut output_curve_count = 0
+  for offset in 0..<span.curve_count {
+    let curve_index = span.start_curve + offset
+    let local_start = clamp_unit(start_curve - curve_index.to_double())
+    let local_end = clamp_unit(end_curve - curve_index.to_double())
+    if local_end > local_start {
+      append_partial_curve(
+        output_points, source_points, curve_index, local_start, local_end,
+      )
+      output_curve_count += 1
+    }
+  }
+  if output_curve_count > 0 {
+    output_subpaths.push({
+      start_curve: output_start_curve,
+      curve_count: output_curve_count,
+      closed: span_fully_selected(span, start_curve, end_curve),
+    })
+  }
+}
+
+///|
+fn append_partial_curve(
+  output : Array[Vec3],
+  points : Array[Vec3],
+  curve_index : Int,
+  start : Double,
+  end : Double,
+) -> Unit {
+  let base = curve_index * 4
+  let (p0, p1, p2, p3) = partial_cubic(
+    points[base],
+    points[base + 1],
+    points[base + 2],
+    points[base + 3],
+    start,
+    end,
+  )
+  append_cubic(output, p0, p1, p2, p3)
+}
+
+///|
+fn span_fully_selected(
+  span : SubpathSpan,
+  start_curve : Double,
+  end_curve : Double,
+) -> Bool {
+  span.closed &&
+  start_curve <= span.start_curve.to_double() &&
+  end_curve >= (span.start_curve + span.curve_count).to_double()
+}
+
+///|
 fn lerp(start : Vec3, end : Vec3, t : Double) -> Vec3 {
   start.add(end.sub(start).scale(t))
 }
@@ -420,6 +522,17 @@ fn cubic_derivative(
   .scale(3.0 * u * u)
   .add(handle2.sub(handle1).scale(6.0 * u * t))
   .add(anchor1.sub(handle2).scale(3.0 * t * t))
+}
+
+///|
+fn clamp_unit(value : Double) -> Double {
+  if value.is_nan() || value < 0.0 {
+    0.0
+  } else if value > 1.0 {
+    1.0
+  } else {
+    value
+  }
 }
 
 ///|

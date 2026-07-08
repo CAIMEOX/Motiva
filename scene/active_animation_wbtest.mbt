@@ -95,6 +95,47 @@ test "active transform morphs incompatible path commands through point buffer" {
 }
 
 ///|
+test "create samples a path prefix over time" {
+  let scene = Scene::new()
+  let square = scene.object(@object.Square::new(side_length=4.0))
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::create(square, run_time=2.0),
+  )
+  guard patch_put_object(active.begin_patch(), square) is Some(begin) else {
+    fail("create begin patch should put a starting object")
+  }
+  guard begin.node is Path(begin_path, _) else {
+    fail("create begin object should remain a path")
+  }
+  assert_eq(begin_path.eval().curve_count(), 0)
+  guard patch_put_object(active.sample(0.5), square) is Some(mid) else {
+    fail("create sample should put a partial object")
+  }
+  guard mid.node is Path(mid_path, _) else {
+    fail("create sample object should remain a path")
+  }
+  let mid_buffer = mid_path.eval()
+  assert_eq(mid_buffer.curve_count(), 2)
+  guard mid_buffer.subpaths().get(0) is Some(mid_span) else {
+    fail("mid create sample should keep one subpath")
+  }
+  assert_true(!mid_span.closed)
+  guard patch_put_object(active.finish_patch(), square) is Some(finish) else {
+    fail("create finish patch should put the final object")
+  }
+  guard finish.node is Path(finish_path, _) else {
+    fail("create finish object should remain a path")
+  }
+  let finish_buffer = finish_path.eval()
+  assert_eq(finish_buffer.curve_count(), 4)
+  guard finish_buffer.subpaths().get(0) is Some(finish_span) else {
+    fail("finish create sample should keep one subpath")
+  }
+  assert_true(finish_span.closed)
+}
+
+///|
 test "wait active animation has no affected ids and empty patches" {
   let scene = Scene::new()
   let active = ActiveAnimation::compile(scene, Animation::wait(1.0))
