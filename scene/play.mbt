@@ -4,15 +4,26 @@ pub fn[T : IntoAnimation] Scene::play(
   animations : Array[T],
 ) -> Unit raise SceneError {
   let compiled = animations.map(into_animation)
-  let run_time = compiled.fold(init=0.0, (duration, animation) => {
-    if animation.timing.run_time > duration {
-      animation.timing.run_time
+  let active_animations = compiled.map(animation => {
+    ActiveAnimation::compile(self, animation)
+  })
+  let _affected_ids = active_animations.fold(init=[], (ids, animation) => {
+    let next = ids.copy()
+    next.append(animation.affected_ids())
+    next
+  })
+  let run_time = active_animations.fold(init=0.0, (duration, animation) => {
+    if animation.run_time() > duration {
+      animation.run_time()
     } else {
       duration
     }
   })
-  for animation in compiled {
-    self.finish_animation(animation)
+  for animation in active_animations {
+    self.apply_frame_patch(animation.begin_patch())
+  }
+  for animation in active_animations {
+    self.apply_frame_patch(animation.finish_patch())
   }
   self.time += run_time
 }
@@ -20,35 +31,4 @@ pub fn[T : IntoAnimation] Scene::play(
 ///|
 pub fn Scene::time(self : Scene) -> Double {
   self.time
-}
-
-///|
-fn Scene::finish_animation(
-  self : Scene,
-  animation : Animation,
-) -> Unit raise SceneError {
-  match animation.kind {
-    Wait => ()
-    Create(id) | FadeIn(id) => self.show(id)
-    FadeOut(id) => self.remove(id)
-    Transform(id, target) => {
-      self.replace_object(id, target)
-      self.show_if_hidden(id)
-    }
-    ApplyOps(id, ops) => {
-      let scene_object = self.require_object(id)
-      let target = ops.fold(init=scene_object.object, (object, op) => {
-        op.apply(object)
-      })
-      self.replace_object(id, target)
-      self.show_if_hidden(id)
-    }
-  }
-}
-
-///|
-fn Scene::show_if_hidden(self : Scene, id : ObjectId) -> Unit raise SceneError {
-  if !self.is_visible(id) {
-    self.show(id)
-  }
 }

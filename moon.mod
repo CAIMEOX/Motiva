@@ -22,3 +22,7 @@ license = "Apache-2.0"
 keywords = [ "animation", "manim", "graphics", "timeline" ]
 
 description = "A MoonBit animation engine inspired by Manim."
+
+import {
+  "CAIMEOX/cairoon@0.1.0",
+}
