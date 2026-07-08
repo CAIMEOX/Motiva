@@ -12,18 +12,18 @@ fn assert_point_close(actual : Vec3, expected : Vec3) -> Unit raise {
 
 ///|
 fn assert_buffer_point_close(
-  buffer : Array[Vec3],
+  buffer : PathBuffer3D,
   index : Int,
   expected : Vec3,
 ) -> Unit raise {
-  guard buffer.get(index) is Some(point) else {
+  guard buffer.point(index) is Some(point) else {
     fail("point buffer should contain the requested point")
   }
   assert_point_close(point, expected)
 }
 
 ///|
-fn eval_result(path : Path3D) -> Result[Array[Vec3], PathEvalError] {
+fn eval_result(path : Path3D) -> Result[PathBuffer3D, PathEvalError] {
   try path.eval() catch {
     error => Err(error)
   } noraise {
@@ -95,8 +95,13 @@ test "circle point_at_angle uses local circle geometry" {
 ///|
 test "circle path eval lowers to one cubic segment per arc segment" {
   let buffer = Circle::new(radius=2.0, segments=8).path().eval()
-  assert_eq(buffer.length() / 4, 8)
-  assert_eq(buffer.length(), 32)
+  assert_eq(buffer.curve_count(), 8)
+  assert_eq(buffer.point_count(), 32)
+  guard buffer.subpaths().get(0) is Some(span) else {
+    fail("closed circle should have one subpath")
+  }
+  assert_eq(span.curve_count, 8)
+  assert_true(span.closed)
 }
 
 ///|
@@ -150,8 +155,8 @@ test "3d transform applies translation scale and z rotation" {
 ///|
 test "square path eval lowers lines to cubic point buffer" {
   let buffer = Square::new(side_length=4.0).path().eval()
-  assert_eq(buffer.length() / 4, 4)
-  assert_eq(buffer.length(), 16)
+  assert_eq(buffer.curve_count(), 4)
+  assert_eq(buffer.point_count(), 16)
   assert_buffer_point_close(buffer, 0, Vec3::new(x=-2.0, y=-2.0))
   assert_buffer_point_close(buffer, 1, Vec3::new(x=-2.0 + 4.0 / 3.0, y=-2.0))
   assert_buffer_point_close(buffer, 2, Vec3::new(x=-2.0 + 8.0 / 3.0, y=-2.0))
@@ -163,9 +168,52 @@ test "square path eval lowers lines to cubic point buffer" {
 test "point buffer maps every 3d point" {
   let buffer = Square::new(side_length=4.0).path().eval()
   let offset = Vec3::new(x=1.0, y=-1.0, z=2.0)
-  let transformed = buffer.map(point => point.add(offset))
+  let transformed = buffer.map_points(point => point.add(offset))
   assert_buffer_point_close(transformed, 0, Vec3::new(x=-1.0, y=-3.0, z=2.0))
   assert_buffer_point_close(transformed, 15, Vec3::new(x=-1.0, y=-3.0, z=2.0))
+}
+
+///|
+test "point buffer from_points rejects invalid cubic point count" {
+  let result = try
+    PathBuffer3D::from_points([Vec3::zero(), Vec3::new(x=1.0, y=0.0)])
+  catch {
+    error => Err(error)
+  } noraise {
+    _ => Ok(())
+  }
+  guard result is Err(InvalidPointCount(count)) else {
+    fail("invalid point count should return typed PathBufferError")
+  }
+  assert_eq(count, 2)
+}
+
+///|
+test "point buffer normalizes square and circle curve counts" {
+  let square = Square::new(side_length=4.0).path().eval()
+  let circle = Circle::new(radius=2.0, segments=8).path().eval()
+  let (normalized_square, normalized_circle) = square.normalize_pair(circle)
+  assert_eq(normalized_square.curve_count(), 8)
+  assert_eq(normalized_circle.curve_count(), 8)
+  assert_eq(normalized_square.point_count(), normalized_circle.point_count())
+  guard normalized_square.subpaths().get(0) is Some(square_span) else {
+    fail("normalized square should have one subpath")
+  }
+  guard normalized_circle.subpaths().get(0) is Some(circle_span) else {
+    fail("normalized circle should have one subpath")
+  }
+  assert_true(square_span.closed)
+  assert_true(circle_span.closed)
+}
+
+///|
+test "point buffer lerp returns compatible cubic path" {
+  let square = Square::new(side_length=4.0).path().eval()
+  let circle = Circle::new(radius=2.0, segments=8).path().eval()
+  let midpoint = square.lerp(circle, 0.5)
+  assert_eq(midpoint.curve_count(), 8)
+  let path = midpoint.to_path()
+  assert_eq(path.commands.length(), 10)
 }
 
 ///|

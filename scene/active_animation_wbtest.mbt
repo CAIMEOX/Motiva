@@ -76,6 +76,25 @@ test "active transform begin makes allocated source visible" {
 }
 
 ///|
+test "active transform morphs incompatible path commands through point buffer" {
+  let scene = Scene::new()
+  let square = scene.object(@object.Square::new(side_length=4.0))
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::transform(square, @object.Circle::new(radius=2.0, segments=8)),
+  )
+  guard patch_put_object(active.sample(0.5), square) is Some(sampled) else {
+    fail("sample should put morphed object")
+  }
+  guard sampled.node is Path(path, _) else {
+    fail("morphed object should remain a path")
+  }
+  assert_eq(path.commands.length(), 10)
+  let buffer = path.eval()
+  assert_eq(buffer.curve_count(), 8)
+}
+
+///|
 test "wait active animation has no affected ids and empty patches" {
   let scene = Scene::new()
   let active = ActiveAnimation::compile(scene, Animation::wait(1.0))

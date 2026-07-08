@@ -59,48 +59,11 @@ fn interpolate_path(
   target : @object.Path3D,
   alpha : Double,
 ) -> @object.Path3D {
-  if start.commands.length() != target.commands.length() {
-    choose_endpoint(start, target, alpha)
-  } else {
-    let commands : Array[@object.PathCommand] = []
-    let mut compatible = true
-    for index in 0..<start.commands.length() {
-      match (start.commands.get(index), target.commands.get(index)) {
-        (Some(start_command), Some(target_command)) =>
-          match interpolate_path_command(start_command, target_command, alpha) {
-            None => compatible = false
-            Some(command) => commands.push(command)
-          }
-        _ => compatible = false
-      }
-    }
-    if compatible {
-      { commands, }
-    } else {
-      choose_endpoint(start, target, alpha)
-    }
-  }
-}
-
-///|
-fn interpolate_path_command(
-  start : @object.PathCommand,
-  target : @object.PathCommand,
-  alpha : Double,
-) -> @object.PathCommand? {
-  match (start, target) {
-    (MoveTo(a), MoveTo(b)) => Some(MoveTo(interpolate_vec3(a, b, alpha)))
-    (LineTo(a), LineTo(b)) => Some(LineTo(interpolate_vec3(a, b, alpha)))
-    (CubicTo(a1, a2, a3), CubicTo(b1, b2, b3)) =>
-      Some(
-        CubicTo(
-          interpolate_vec3(a1, b1, alpha),
-          interpolate_vec3(a2, b2, alpha),
-          interpolate_vec3(a3, b3, alpha),
-        ),
-      )
-    (Close, Close) => Some(Close)
-    _ => None
+  try {
+    let (sb, tb) = (start.eval(), target.eval())
+    sb.lerp(tb, alpha).to_path()
+  } catch {
+    _ => choose_endpoint(start, target, alpha)
   }
 }
 
@@ -169,19 +132,6 @@ fn interpolate_transform(
     m22: lerp_double(start.m22, target.m22, alpha),
     m23: lerp_double(start.m23, target.m23, alpha),
   }
-}
-
-///|
-fn interpolate_vec3(
-  start : @object.Vec3,
-  target : @object.Vec3,
-  alpha : Double,
-) -> @object.Vec3 {
-  @object.Vec3::new(
-    x=lerp_double(start.x, target.x, alpha),
-    y=lerp_double(start.y, target.y, alpha),
-    z=lerp_double(start.z, target.z, alpha),
-  )
 }
 
 ///|
