@@ -22,15 +22,16 @@ pub(all) struct Animation {
   kind : AnimationKind
   timing : Timing
 }
-pub fn Animation::apply_ops(ObjectId, Array[ObjectOp], run_time? : Double) -> Self
-pub fn Animation::create(ObjectId, run_time? : Double) -> Self
-pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double) -> Self
-pub fn Animation::fade_in(ObjectId, run_time? : Double) -> Self
-pub fn Animation::fade_out(ObjectId, run_time? : Double) -> Self
+pub fn Animation::apply_ops(ObjectId, Array[ObjectOp], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::create(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::fade_in(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
-pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double) -> Self
-pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, name? : String) -> Self
+pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, name? : String) -> Self
 pub fn Animation::wait(Double) -> Self
+pub fn Animation::with_rate_func(Self, RateFunc) -> Self
 pub fn Animation::with_run_time(Self, Double) -> Self
 pub impl IntoAnimation for Animation
 
@@ -49,6 +50,7 @@ pub fn AnimationBuilder::set_z_index(Self, Double) -> Self
 pub fn AnimationBuilder::shift(Self, @object.Vec3) -> Self
 pub fn AnimationBuilder::target(Self, @object.Object) -> @object.Object
 pub fn AnimationBuilder::to_animation(Self) -> Animation
+pub fn AnimationBuilder::with_rate_func(Self, RateFunc) -> Self
 pub fn AnimationBuilder::with_run_time(Self, Double) -> Self
 pub impl IntoAnimation for AnimationBuilder
 
@@ -73,7 +75,7 @@ pub(all) struct FrameTime {
 pub(all) struct ObjectId {
   value : Int
 } derive(Eq, Hash)
-pub fn ObjectId::animate(Self, run_time? : Double) -> AnimationBuilder
+pub fn ObjectId::animate(Self, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> AnimationBuilder
 pub fn ObjectId::value(Self) -> Int
 
 pub(all) enum ObjectOp {
@@ -123,6 +125,18 @@ pub(all) struct PlayWriter {
 }
 pub fn PlayWriter::new((Scene, Array[Animation]) -> Unit raise SceneError) -> Self
 pub fn PlayWriter::write(Self, Scene, Array[Animation]) -> Unit raise SceneError
+
+pub(all) enum RateFunc {
+  Linear
+  Smooth
+  RushInto
+  RushFrom
+  SlowInto
+  DoubleSmooth
+  ThereAndBack
+  Custom((Double) -> Double)
+}
+pub fn RateFunc::sample(Self, Double) -> Double
 
 pub(all) struct RotationSpec {
   angle : Double
@@ -180,8 +194,14 @@ pub(all) struct SceneObject {
 
 pub(all) struct Timing {
   run_time : Double
+  rate_func : RateFunc
+  reverse_rate_function : Bool
 }
-pub fn Timing::new(run_time? : Double) -> Self
+pub fn Timing::alpha_at(Self, Double) -> Double
+pub fn Timing::new(run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Timing::raw_alpha_at(Self, Double) -> Double
+pub fn Timing::with_rate_func(Self, RateFunc) -> Self
+pub fn Timing::with_run_time(Self, Double) -> Self
 
 // Type aliases
 

@@ -1,11 +1,115 @@
 ///|
-pub(all) struct Timing {
-  run_time : Double
+pub(all) enum RateFunc {
+  Linear
+  Smooth
+  RushInto
+  RushFrom
+  SlowInto
+  DoubleSmooth
+  ThereAndBack
+  Custom((Double) -> Double)
 }
 
 ///|
-pub fn Timing::new(run_time? : Double = 1.0) -> Timing {
-  { run_time, }
+pub fn RateFunc::sample(self : RateFunc, t : Double) -> Double {
+  let t = clamp_unit(t)
+  match self {
+    Linear => t
+    Smooth => smooth_rate(t)
+    RushInto => 2.0 * smooth_rate(0.5 * t)
+    RushFrom => 2.0 * smooth_rate(0.5 * (t + 1.0)) - 1.0
+    SlowInto => @math.pow(1.0 - (1.0 - t) * (1.0 - t), 0.5)
+    DoubleSmooth =>
+      if t < 0.5 {
+        0.5 * smooth_rate(2.0 * t)
+      } else {
+        0.5 * (1.0 + smooth_rate(2.0 * t - 1.0))
+      }
+    ThereAndBack =>
+      if t < 0.5 {
+        smooth_rate(2.0 * t)
+      } else {
+        smooth_rate(2.0 * (1.0 - t))
+      }
+    Custom(f) => f(t)
+  }
+}
+
+///|
+fn clamp_unit(t : Double) -> Double {
+  if t.is_nan() || t < 0.0 {
+    0.0
+  } else if t > 1.0 {
+    1.0
+  } else {
+    t
+  }
+}
+
+///|
+fn smooth_rate(t : Double) -> Double {
+  let inflection = 10.0
+  let error = sigmoid(-0.5 * inflection)
+  (sigmoid(inflection * (t - 0.5)) - error) / (1.0 - 2.0 * error)
+}
+
+///|
+fn sigmoid(x : Double) -> Double {
+  1.0 / (1.0 + @math.exp(-x))
+}
+
+///|
+pub(all) struct Timing {
+  run_time : Double
+  rate_func : RateFunc
+  reverse_rate_function : Bool
+}
+
+///|
+pub fn Timing::new(
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Timing {
+  { run_time, rate_func, reverse_rate_function }
+}
+
+///|
+pub fn Timing::raw_alpha_at(self : Timing, elapsed : Double) -> Double {
+  if self.run_time <= 0.0 {
+    1.0
+  } else {
+    clamp_unit(elapsed / self.run_time)
+  }
+}
+
+///|
+pub fn Timing::alpha_at(self : Timing, elapsed : Double) -> Double {
+  let raw_alpha = self.raw_alpha_at(elapsed)
+  let local_alpha = if self.reverse_rate_function {
+    1.0 - raw_alpha
+  } else {
+    raw_alpha
+  }
+  self.rate_func.sample(local_alpha)
+}
+
+///|
+pub fn Timing::with_run_time(self : Timing, run_time : Double) -> Timing {
+  {
+    run_time,
+    rate_func: self.rate_func,
+    reverse_rate_function: self.reverse_rate_function,
+  }
+}
+
+///|
+pub fn Timing::with_rate_func(self : Timing, rate_func : RateFunc) -> Timing {
+  {
+    run_time: self.run_time,
+    rate_func,
+    reverse_rate_function: self.reverse_rate_function,
+  }
 }
 
 ///|
@@ -122,16 +226,29 @@ pub fn Animation::wait(duration : Double) -> Animation {
 }
 
 ///|
-pub fn Animation::create(id : ObjectId, run_time? : Double = 1.0) -> Animation {
-  Animation::new(Create(id), timing=Timing::new(run_time~))
+pub fn Animation::create(
+  id : ObjectId,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::new(
+    Create(id),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
 }
 
 ///|
 pub fn Animation::draw_border_then_fill(
   id : ObjectId,
   run_time? : Double = 2.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
 ) -> Animation {
-  Animation::new(DrawBorderThenFill(id), timing=Timing::new(run_time~))
+  Animation::new(
+    DrawBorderThenFill(id),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
 }
 
 ///|
@@ -142,22 +259,40 @@ pub fn Animation::rotate(
   about_point? : @object.Vec3,
   about_edge? : @object.Vec3,
   run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
 ) -> Animation {
   let spec : RotationSpec = { angle, axis, about_point, about_edge }
-  Animation::new(Rotate(id, spec), timing=Timing::new(run_time~))
+  Animation::new(
+    Rotate(id, spec),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
 }
 
 ///|
-pub fn Animation::fade_in(id : ObjectId, run_time? : Double = 1.0) -> Animation {
-  Animation::new(FadeIn(id), timing=Timing::new(run_time~))
+pub fn Animation::fade_in(
+  id : ObjectId,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::new(
+    FadeIn(id),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
 }
 
 ///|
 pub fn Animation::fade_out(
   id : ObjectId,
   run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
 ) -> Animation {
-  Animation::new(FadeOut(id), timing=Timing::new(run_time~))
+  Animation::new(
+    FadeOut(id),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
 }
 
 ///|
@@ -165,11 +300,13 @@ pub fn[T : @object.IntoObject] Animation::transform(
   id : ObjectId,
   target : T,
   run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
   name? : String = "",
 ) -> Animation {
   Animation::new(
     Transform(id, @object.into_object(target, id=name)),
-    timing=Timing::new(run_time~),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
   )
 }
 
@@ -178,8 +315,13 @@ pub fn Animation::apply_ops(
   id : ObjectId,
   ops : Array[ObjectOp],
   run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
 ) -> Animation {
-  Animation::new(ApplyOps(id, ops.copy()), timing=Timing::new(run_time~))
+  Animation::new(
+    ApplyOps(id, ops.copy()),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
 }
 
 ///|
@@ -187,7 +329,15 @@ pub fn Animation::with_run_time(
   self : Animation,
   run_time : Double,
 ) -> Animation {
-  { kind: self.kind, timing: Timing::new(run_time~) }
+  { kind: self.kind, timing: self.timing.with_run_time(run_time) }
+}
+
+///|
+pub fn Animation::with_rate_func(
+  self : Animation,
+  rate_func : RateFunc,
+) -> Animation {
+  { kind: self.kind, timing: self.timing.with_rate_func(rate_func) }
 }
 
 ///|
@@ -216,8 +366,14 @@ pub(all) struct AnimationBuilder {
 pub fn ObjectId::animate(
   self : ObjectId,
   run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
 ) -> AnimationBuilder {
-  { id: self, ops: [], timing: Timing::new(run_time~) }
+  {
+    id: self,
+    ops: [],
+    timing: Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  }
 }
 
 ///|
@@ -225,7 +381,23 @@ pub fn AnimationBuilder::with_run_time(
   self : AnimationBuilder,
   run_time : Double,
 ) -> AnimationBuilder {
-  { id: self.id, ops: self.ops.copy(), timing: Timing::new(run_time~) }
+  {
+    id: self.id,
+    ops: self.ops.copy(),
+    timing: self.timing.with_run_time(run_time),
+  }
+}
+
+///|
+pub fn AnimationBuilder::with_rate_func(
+  self : AnimationBuilder,
+  rate_func : RateFunc,
+) -> AnimationBuilder {
+  {
+    id: self.id,
+    ops: self.ops.copy(),
+    timing: self.timing.with_rate_func(rate_func),
+  }
 }
 
 ///|
@@ -304,7 +476,7 @@ pub fn AnimationBuilder::target(
 
 ///|
 pub fn AnimationBuilder::to_animation(self : AnimationBuilder) -> Animation {
-  Animation::apply_ops(self.id, self.ops, run_time=self.timing.run_time)
+  Animation::new(ApplyOps(self.id, self.ops.copy()), timing=self.timing)
 }
 
 ///|

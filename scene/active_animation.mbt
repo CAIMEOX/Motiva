@@ -324,11 +324,7 @@ fn ActiveAnimation::alpha_at_time(
   self : ActiveAnimation,
   elapsed : Double,
 ) -> Double {
-  if self.timing.run_time <= 0.0 {
-    1.0
-  } else {
-    clamp_alpha(elapsed / self.timing.run_time)
-  }
+  self.timing.alpha_at(elapsed)
 }
 
 ///|
