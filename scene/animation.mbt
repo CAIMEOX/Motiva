@@ -221,6 +221,22 @@ pub fn ScaleSpec::new(
 }
 
 ///|
+pub(all) struct FadeSpec {
+  shift : @object.Vec3?
+  target_position : @object.Vec3?
+  scale : Double
+}
+
+///|
+pub fn FadeSpec::new(
+  shift? : @object.Vec3,
+  target_position? : @object.Vec3,
+  scale? : Double = 1.0,
+) -> FadeSpec {
+  { shift, target_position, scale }
+}
+
+///|
 pub(all) enum ObjectOp {
   ApplyTransform(@object.Transform)
   ScaleOp(ScaleSpec)
@@ -295,8 +311,8 @@ pub(all) enum AnimationKind {
   DrawBorderThenFill(ObjectId)
   Scale(ObjectId, ScaleSpec)
   Rotate(ObjectId, RotationSpec)
-  FadeIn(ObjectId)
-  FadeOut(ObjectId)
+  FadeIn(ObjectId, FadeSpec)
+  FadeOut(ObjectId, FadeSpec)
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
@@ -440,9 +456,13 @@ pub fn Animation::fade_in(
   run_time? : Double = 1.0,
   rate_func? : RateFunc = Linear,
   reverse_rate_function? : Bool = false,
+  shift? : @object.Vec3,
+  target_position? : @object.Vec3,
+  scale? : Double = 1.0,
 ) -> Animation {
+  let spec = FadeSpec::new(shift?, target_position?, scale~)
   Animation::new(
-    FadeIn(id),
+    FadeIn(id, spec),
     timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
   )
 }
@@ -453,9 +473,13 @@ pub fn Animation::fade_out(
   run_time? : Double = 1.0,
   rate_func? : RateFunc = Linear,
   reverse_rate_function? : Bool = false,
+  shift? : @object.Vec3,
+  target_position? : @object.Vec3,
+  scale? : Double = 1.0,
 ) -> Animation {
+  let spec = FadeSpec::new(shift?, target_position?, scale~)
   Animation::new(
-    FadeOut(id),
+    FadeOut(id, spec),
     timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
   )
 }

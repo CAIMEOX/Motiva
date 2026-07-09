@@ -25,8 +25,8 @@ pub(all) struct Animation {
 pub fn Animation::apply_ops(ObjectId, Array[ObjectOp], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::create(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
-pub fn Animation::fade_in(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
-pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::fade_in(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
+pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
 pub fn[T : IntoAnimation] Animation::group(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn[T : IntoAnimation] Animation::lagged_start(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
@@ -69,12 +69,19 @@ pub(all) enum AnimationKind {
   DrawBorderThenFill(ObjectId)
   Scale(ObjectId, ScaleSpec)
   Rotate(ObjectId, RotationSpec)
-  FadeIn(ObjectId)
-  FadeOut(ObjectId)
+  FadeIn(ObjectId, FadeSpec)
+  FadeOut(ObjectId, FadeSpec)
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
 }
+
+pub(all) struct FadeSpec {
+  shift : @object.Vec3?
+  target_position : @object.Vec3?
+  scale : Double
+}
+pub fn FadeSpec::new(shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
 
 pub(all) struct FrameTime {
   frame_index : Int

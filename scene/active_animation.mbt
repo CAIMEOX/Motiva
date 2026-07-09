@@ -6,17 +6,6 @@ priv struct AnimationLifecycle {
 }
 
 ///|
-priv enum RevealMode {
-  CreateReveal
-  FadeInReveal
-}
-
-///|
-priv enum RemovalMode {
-  FadeOutRemoval
-}
-
-///|
 priv struct ActiveChild {
   animation : ActiveAnimation
   start_time : Double
@@ -29,13 +18,12 @@ priv enum ActiveAnimationKind {
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
   ActiveScale(ObjectId, start~ : @object.Object, spec~ : ScaleSpec)
   ActiveRotate(ObjectId, start~ : @object.Object, spec~ : RotationSpec)
-  ActiveReveal(ObjectId, source~ : @object.Object, mode~ : RevealMode)
+  ActiveReveal(ObjectId, source~ : @object.Object)
   ActiveDrawBorderThenFill(
     ObjectId,
     source~ : @object.Object,
     outline~ : @object.Object
   )
-  ActiveRemoval(ObjectId, source~ : @object.Object, mode~ : RemovalMode)
   ActiveGroup(Array[ActiveChild], natural_run_time~ : Double)
 }
 
@@ -72,7 +60,6 @@ fn ActiveAnimation::compile(
       ActiveAnimation::reveal(
         id,
         source=scene.require_object(id).object,
-        mode=CreateReveal,
         timing=animation.timing,
       )
     DrawBorderThenFill(id) =>
@@ -95,18 +82,18 @@ fn ActiveAnimation::compile(
         spec~,
         timing=animation.timing,
       )
-    FadeIn(id) =>
-      ActiveAnimation::reveal(
+    FadeIn(id, spec) =>
+      ActiveAnimation::fade_in(
         id,
         source=scene.require_object(id).object,
-        mode=FadeInReveal,
+        spec~,
         timing=animation.timing,
       )
-    FadeOut(id) =>
-      ActiveAnimation::removal(
+    FadeOut(id, spec) =>
+      ActiveAnimation::fade_out(
         id,
         source=scene.require_object(id).object,
-        mode=FadeOutRemoval,
+        spec~,
         timing=animation.timing,
       )
     Transform(id, target) =>
@@ -143,15 +130,32 @@ fn ActiveAnimation::transform(
   target~ : @object.Object,
   timing~ : Timing,
 ) -> ActiveAnimation {
-  {
-    kind: ActiveTransform(id, start~, target~),
-    timing,
-    run_time: timing.resolve_run_time(1.0),
-    lifecycle: AnimationLifecycle::new(
+  ActiveAnimation::transform_with_lifecycle(
+    id,
+    start~,
+    target~,
+    timing~,
+    lifecycle=AnimationLifecycle::new(
       introducer=false,
       remover=false,
       mutates_object=true,
     ),
+  )
+}
+
+///|
+fn ActiveAnimation::transform_with_lifecycle(
+  id : ObjectId,
+  start~ : @object.Object,
+  target~ : @object.Object,
+  timing~ : Timing,
+  lifecycle~ : AnimationLifecycle,
+) -> ActiveAnimation {
+  {
+    kind: ActiveTransform(id, start~, target~),
+    timing,
+    run_time: timing.resolve_run_time(1.0),
+    lifecycle,
   }
 }
 
@@ -197,11 +201,10 @@ fn ActiveAnimation::rotate(
 fn ActiveAnimation::reveal(
   id : ObjectId,
   source~ : @object.Object,
-  mode~ : RevealMode,
   timing~ : Timing,
 ) -> ActiveAnimation {
   {
-    kind: ActiveReveal(id, source~, mode~),
+    kind: ActiveReveal(id, source~),
     timing,
     run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::new(
@@ -210,6 +213,46 @@ fn ActiveAnimation::reveal(
       mutates_object=true,
     ),
   }
+}
+
+///|
+fn ActiveAnimation::fade_in(
+  id : ObjectId,
+  source~ : @object.Object,
+  spec~ : FadeSpec,
+  timing~ : Timing,
+) -> ActiveAnimation {
+  ActiveAnimation::transform_with_lifecycle(
+    id,
+    start=make_faded_object(source, spec, fade_in=true),
+    target=source,
+    timing~,
+    lifecycle=AnimationLifecycle::new(
+      introducer=true,
+      remover=false,
+      mutates_object=true,
+    ),
+  )
+}
+
+///|
+fn ActiveAnimation::fade_out(
+  id : ObjectId,
+  source~ : @object.Object,
+  spec~ : FadeSpec,
+  timing~ : Timing,
+) -> ActiveAnimation {
+  ActiveAnimation::transform_with_lifecycle(
+    id,
+    start=source,
+    target=make_faded_object(source, spec, fade_in=false),
+    timing~,
+    lifecycle=AnimationLifecycle::new(
+      introducer=false,
+      remover=true,
+      mutates_object=true,
+    ),
+  )
 }
 
 ///|
@@ -229,25 +272,6 @@ fn ActiveAnimation::draw_border_then_fill(
     lifecycle: AnimationLifecycle::new(
       introducer=true,
       remover=false,
-      mutates_object=true,
-    ),
-  }
-}
-
-///|
-fn ActiveAnimation::removal(
-  id : ObjectId,
-  source~ : @object.Object,
-  mode~ : RemovalMode,
-  timing~ : Timing,
-) -> ActiveAnimation {
-  {
-    kind: ActiveRemoval(id, source~, mode~),
-    timing,
-    run_time: timing.resolve_run_time(1.0),
-    lifecycle: AnimationLifecycle::new(
-      introducer=false,
-      remover=true,
       mutates_object=true,
     ),
   }
@@ -316,8 +340,7 @@ fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
     | ActiveScale(id, ..)
     | ActiveRotate(id, ..)
     | ActiveReveal(id, ..)
-    | ActiveDrawBorderThenFill(id, ..)
-    | ActiveRemoval(id, ..) => [id]
+    | ActiveDrawBorderThenFill(id, ..) => [id]
     ActiveGroup(children, ..) =>
       children.fold(init=[], (ids, child) => {
         let next = ids.copy()
@@ -347,19 +370,14 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
         FramePatch::put(id, start),
         FramePatch::ensure_visible(id),
       ])
-    ActiveReveal(id, source~, mode~) =>
+    ActiveReveal(id, source~) =>
       FramePatch::all([
-        FramePatch::put(id, sample_reveal(source, mode, 0.0)),
+        FramePatch::put(id, sample_create_object(source, 0.0)),
         FramePatch::ensure_visible(id),
       ])
     ActiveDrawBorderThenFill(id, source~, outline~) =>
       FramePatch::all([
         FramePatch::put(id, sample_draw_border_then_fill(source, outline, 0.0)),
-        FramePatch::ensure_visible(id),
-      ])
-    ActiveRemoval(id, source~, ..) =>
-      FramePatch::all([
-        FramePatch::put(id, source),
         FramePatch::ensure_visible(id),
       ])
     ActiveGroup(children, ..) =>
@@ -393,9 +411,9 @@ fn ActiveAnimation::sample(
           FramePatch::put(id, sample_rotate_object(start, spec, alpha)),
           FramePatch::ensure_visible(id),
         ])
-      ActiveReveal(id, source~, mode~) =>
+      ActiveReveal(id, source~) =>
         FramePatch::all([
-          FramePatch::put(id, sample_reveal(source, mode, alpha)),
+          FramePatch::put(id, sample_create_object(source, alpha)),
           FramePatch::ensure_visible(id),
         ])
       ActiveDrawBorderThenFill(id, source~, outline~) =>
@@ -404,11 +422,6 @@ fn ActiveAnimation::sample(
             id,
             sample_draw_border_then_fill(source, outline, alpha),
           ),
-          FramePatch::ensure_visible(id),
-        ])
-      ActiveRemoval(id, source~, mode~) =>
-        FramePatch::all([
-          FramePatch::put(id, sample_removal(source, mode, alpha)),
           FramePatch::ensure_visible(id),
         ])
       ActiveGroup(_, ..) => FramePatch::empty()
@@ -436,10 +449,9 @@ fn ActiveAnimation::finish_patch(self : ActiveAnimation) -> FramePatch {
     _ => {
       let final_sample = self.sample_at_time(self.run_time())
       if self.lifecycle.remover {
-        match self.kind {
-          ActiveRemoval(id, ..) => final_sample.then(FramePatch::hide(id))
-          _ => final_sample
-        }
+        final_sample.then(
+          FramePatch::all(self.affected_ids().map(id => FramePatch::hide(id))),
+        )
       } else {
         final_sample
       }
@@ -478,18 +490,6 @@ fn ActiveChild::sample_at_group_time(
     self.animation.finish_patch()
   } else {
     self.animation.sample_at_time(group_time - self.start_time)
-  }
-}
-
-///|
-fn sample_reveal(
-  source : @object.Object,
-  mode : RevealMode,
-  alpha : Double,
-) -> @object.Object {
-  match mode {
-    CreateReveal => sample_create_object(source, alpha)
-    FadeInReveal => source
   }
 }
 
@@ -582,6 +582,50 @@ fn scale_about_transform(
 }
 
 ///|
+fn make_faded_object(
+  source : @object.Object,
+  spec : FadeSpec,
+  fade_in~ : Bool,
+) -> @object.Object {
+  let (shift, point_target) = resolve_fade_shift(spec, source)
+  let direction = if fade_in && !point_target { -1.0 } else { 1.0 }
+  let shifted = source
+    .set_fill(opacity=0.0)
+    .set_stroke(opacity=0.0)
+    .with_transform(
+      source.transform.then(
+        @object.Transform::translate(shift.scale(direction)),
+      ),
+    )
+  if spec.scale == 1.0 {
+    shifted
+  } else {
+    shifted.with_transform(
+      shifted.transform.then(
+        scale_about_transform(
+          sx=spec.scale,
+          sy=spec.scale,
+          sz=spec.scale,
+          point=shifted.center(),
+        ),
+      ),
+    )
+  }
+}
+
+///|
+fn resolve_fade_shift(
+  spec : FadeSpec,
+  source : @object.Object,
+) -> (@object.Vec3, Bool) {
+  match (spec.shift, spec.target_position) {
+    (Some(shift), _) => (shift, false)
+    (None, Some(point)) => (point.sub(source.center()), true)
+    (None, None) => (@object.Vec3::zero(), false)
+  }
+}
+
+///|
 fn resolve_rotation_about_point(
   spec : RotationSpec,
   object : @object.Object,
@@ -650,16 +694,5 @@ fn make_outline_stroke_width(style : @object.ShapeStyle) -> Double {
     4.0
   } else {
     style.stroke_width
-  }
-}
-
-///|
-fn sample_removal(
-  source : @object.Object,
-  mode : RemovalMode,
-  _alpha : Double,
-) -> @object.Object {
-  match mode {
-    FadeOutRemoval => source
   }
 }

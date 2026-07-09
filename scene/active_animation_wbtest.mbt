@@ -12,6 +12,14 @@ fn patch_put_object(patch : FramePatch, id : ObjectId) -> @object.Object? {
 }
 
 ///|
+fn path_style(object : @object.Object) -> @object.ShapeStyle raise {
+  match object.node {
+    Path(_, style) => style
+    _ => fail("expected path object")
+  }
+}
+
+///|
 test "active animation compile captures object op target without mutating scene" {
   let scene = Scene::new()
   let square = scene.object(@object.Square::new())
@@ -47,6 +55,106 @@ test "active animation finish patch for fade out hides object" {
   guard scene.state(square) is Some(Removed) else {
     fail("fade out finish patch should remove visible object")
   }
+}
+
+///|
+test "fade in starts transparent and shifted before restoring source object" {
+  let scene = Scene::new()
+  let style = @object.ShapeStyle::new(
+    fill=@object.Rgba::red(),
+    fill_opacity=1.0,
+    stroke=@object.Rgba::white(),
+    stroke_opacity=1.0,
+    stroke_width=4.0,
+  )
+  let object = @object.into_object(@object.Square::new(side_length=2.0, style~)).with_transform(
+    @object.Transform::translate(@object.Vec3::new(x=2.0, y=1.0)),
+  )
+  let square = scene.object(object)
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::fade_in(
+      square,
+      shift=@object.Vec3::new(x=0.0, y=-2.0),
+      scale=0.5,
+      run_time=2.0,
+    ),
+  )
+  assert_true(active.lifecycle.introducer)
+  guard patch_put_object(active.begin_patch(), square) is Some(begin) else {
+    fail("fade in begin should put a starting object")
+  }
+  let begin_style = path_style(begin)
+  assert_close(begin_style.fill_opacity, 0.0)
+  assert_close(begin_style.stroke_opacity, 0.0)
+  let begin_center = begin.center()
+  assert_close(begin_center.x, 2.0)
+  assert_close(begin_center.y, 3.0)
+  guard begin.bounds() is Some(begin_bounds) else {
+    fail("fade in begin should have bounds")
+  }
+  assert_close(begin_bounds.width(), 1.0)
+  assert_close(begin_bounds.height(), 1.0)
+  guard patch_put_object(active.sample(0.5), square) is Some(mid) else {
+    fail("fade in sample should put an interpolated object")
+  }
+  let mid_style = path_style(mid)
+  assert_close(mid_style.fill_opacity, 0.5)
+  assert_close(mid_style.stroke_opacity, 0.5)
+  guard patch_put_object(active.finish_patch(), square) is Some(finish) else {
+    fail("fade in finish should put the source object")
+  }
+  let finish_style = path_style(finish)
+  assert_close(finish_style.fill_opacity, 1.0)
+  assert_close(finish_style.stroke_opacity, 1.0)
+  let finish_center = finish.center()
+  assert_close(finish_center.x, 2.0)
+  assert_close(finish_center.y, 1.0)
+}
+
+///|
+test "fade out interpolates to transparent shifted target then hides object" {
+  let scene = Scene::new()
+  let style = @object.ShapeStyle::new(
+    fill=@object.Rgba::red(),
+    fill_opacity=0.8,
+    stroke=@object.Rgba::white(),
+    stroke_opacity=0.6,
+    stroke_width=4.0,
+  )
+  let square = scene.add(@object.Square::new(side_length=2.0, style~))
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::fade_out(
+      square,
+      shift=@object.Vec3::new(x=2.0, y=0.0),
+      scale=1.5,
+      run_time=2.0,
+    ),
+  )
+  assert_true(active.lifecycle.remover)
+  guard patch_put_object(active.sample(0.5), square) is Some(mid) else {
+    fail("fade out sample should put an interpolated object")
+  }
+  let mid_style = path_style(mid)
+  assert_close(mid_style.fill_opacity, 0.4)
+  assert_close(mid_style.stroke_opacity, 0.3)
+  guard patch_put_object(active.finish_patch(), square) is Some(finish) else {
+    fail("fade out finish should put the transparent target before hiding")
+  }
+  let finish_style = path_style(finish)
+  assert_close(finish_style.fill_opacity, 0.0)
+  assert_close(finish_style.stroke_opacity, 0.0)
+  let finish_center = finish.center()
+  assert_close(finish_center.x, 2.0)
+  assert_close(finish_center.y, 0.0)
+  guard finish.bounds() is Some(finish_bounds) else {
+    fail("fade out finish should have bounds")
+  }
+  assert_close(finish_bounds.width(), 3.0)
+  assert_close(finish_bounds.height(), 3.0)
+  scene.apply_frame_patch(active.finish_patch())
+  assert_true(!scene.is_visible(square))
 }
 
 ///|
