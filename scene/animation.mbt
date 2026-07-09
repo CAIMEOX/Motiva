@@ -223,6 +223,7 @@ pub fn ScaleSpec::new(
 ///|
 pub(all) enum ObjectOp {
   ApplyTransform(@object.Transform)
+  ScaleOp(ScaleSpec)
   SetTransform(@object.Transform)
   SetZIndex(Double)
 }
@@ -237,8 +238,10 @@ pub fn ObjectOp::scale(
   sx~ : Double,
   sy~ : Double,
   sz? : Double = 1.0,
+  about_point? : @object.Vec3,
+  about_edge? : @object.Vec3,
 ) -> ObjectOp {
-  ApplyTransform(@object.Transform::scale(sx~, sy~, sz~))
+  ScaleOp(ScaleSpec::new(sx~, sy~, sz~, about_point?, about_edge?))
 }
 
 ///|
@@ -279,6 +282,7 @@ pub fn ObjectOp::apply(
   match self {
     ApplyTransform(transform) =>
       object.with_transform(object.transform.then(transform))
+    ScaleOp(spec) => sample_scale_object(object, spec, 1.0)
     SetTransform(transform) => object.with_transform(transform)
     SetZIndex(z_index) => object.with_z_index(z_index)
   }
@@ -583,8 +587,10 @@ pub fn AnimationBuilder::scale(
   sx~ : Double,
   sy~ : Double,
   sz? : Double = 1.0,
+  about_point? : @object.Vec3,
+  about_edge? : @object.Vec3,
 ) -> AnimationBuilder {
-  self.with_op(ObjectOp::scale(sx~, sy~, sz~))
+  self.with_op(ObjectOp::scale(sx~, sy~, sz~, about_point?, about_edge?))
 }
 
 ///|

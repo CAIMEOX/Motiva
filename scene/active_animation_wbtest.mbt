@@ -166,7 +166,7 @@ test "active scale samples around object center" {
 }
 
 ///|
-test "object op scale remains a raw affine transform" {
+test "object op scale keeps object center by default" {
   let scene = Scene::new()
   let object = @object.into_object(@object.Square::new(side_length=2.0)).with_transform(
     @object.Transform::translate(@object.Vec3::new(x=-4.0, y=1.0)),
@@ -185,8 +185,8 @@ test "object op scale remains a raw affine transform" {
     fail("builder scale should put a sampled object")
   }
   let center = sampled.center()
-  assert_close(center.x, -2.0)
-  assert_close(center.y, 1.5)
+  assert_close(center.x, -4.0)
+  assert_close(center.y, 1.0)
   guard sampled.bounds() is Some(bounds) else {
     fail("builder scale sample should have bounds")
   }
