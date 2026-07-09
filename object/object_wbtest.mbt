@@ -138,6 +138,97 @@ test "square object bounds include object transform" {
 }
 
 ///|
+test "line lowers to an open path object" {
+  let line = Line::new(
+    start=Vec3::new(x=-1.0, y=2.0, z=0.5),
+    end=Vec3::new(x=3.0, y=-2.0, z=0.5),
+  )
+  let object = into_object(line, id="line")
+  guard object.node is Path(path, _) else {
+    fail("Line should lower to Node::Path")
+  }
+  assert_eq(path.commands.length(), 2)
+  guard path.commands.get(0) is Some(MoveTo(start)) else {
+    fail("Line should begin with MoveTo")
+  }
+  assert_point_close(start, Vec3::new(x=-1.0, y=2.0, z=0.5))
+  guard path.commands.get(1) is Some(LineTo(end)) else {
+    fail("Line should end with LineTo")
+  }
+  assert_point_close(end, Vec3::new(x=3.0, y=-2.0, z=0.5))
+  let buffer = path.eval()
+  assert_eq(buffer.curve_count(), 1)
+  guard buffer.subpaths().get(0) is Some(span) else {
+    fail("Line should have one subpath")
+  }
+  assert_true(!span.closed)
+}
+
+///|
+test "polygon lowers vertices to a closed path" {
+  let polygon = Polygon::new([
+    Vec3::new(x=-1.0, y=-1.0),
+    Vec3::new(x=2.0, y=-1.0),
+    Vec3::new(x=0.0, y=2.0),
+  ])
+  let object = into_object(polygon, id="polygon")
+  guard object.node is Path(path, _) else {
+    fail("Polygon should lower to Node::Path")
+  }
+  assert_eq(path.commands.length(), 4)
+  guard object.bounds() is Some(bounds) else {
+    fail("Polygon should have bounds")
+  }
+  assert_close(bounds.min.x, -1.0)
+  assert_close(bounds.max.x, 2.0)
+  assert_close(bounds.min.y, -1.0)
+  assert_close(bounds.max.y, 2.0)
+  let buffer = path.eval()
+  assert_eq(buffer.curve_count(), 3)
+  guard buffer.subpaths().get(0) is Some(span) else {
+    fail("Polygon should have one subpath")
+  }
+  assert_true(span.closed)
+}
+
+///|
+test "rectangle is centered at origin with width and height" {
+  let rectangle = Rectangle::new(width=4.0, height=2.0)
+  let object = into_object(rectangle, id="rectangle")
+  guard object.node is Path(path, _) else {
+    fail("Rectangle should lower to Node::Path")
+  }
+  assert_eq(path.commands.length(), 5)
+  guard object.bounds() is Some(bounds) else {
+    fail("Rectangle should have bounds")
+  }
+  assert_close(bounds.min.x, -2.0)
+  assert_close(bounds.max.x, 2.0)
+  assert_close(bounds.min.y, -1.0)
+  assert_close(bounds.max.y, 1.0)
+}
+
+///|
+test "dot is a filled circle centered at its point" {
+  let dot = Dot::new(point=Vec3::new(x=1.0, y=-2.0), radius=0.25, segments=8)
+  let object = into_object(dot, id="dot")
+  guard object.node is Path(path, style) else {
+    fail("Dot should lower to Node::Path")
+  }
+  assert_eq(path.commands.length(), 10)
+  guard style.fill is Some(fill) else { fail("Dot should have a default fill") }
+  assert_close(fill.r, 1.0)
+  assert_close(fill.g, 1.0)
+  assert_close(fill.b, 1.0)
+  assert_close(style.fill_opacity, 1.0)
+  guard object.bounds() is Some(bounds) else { fail("Dot should have bounds") }
+  assert_close(bounds.min.x, 0.75)
+  assert_close(bounds.max.x, 1.25)
+  assert_close(bounds.min.y, -2.25)
+  assert_close(bounds.max.y, -1.75)
+}
+
+///|
 test "3d transform applies translation scale and z rotation" {
   let transform = Transform::scale(sx=2.0, sy=3.0, sz=4.0)
     .then(Transform::translate(Vec3::new(x=1.0, y=2.0, z=3.0)))

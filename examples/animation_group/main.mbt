@@ -44,6 +44,7 @@ fn circle_at(x : Double, y : Double, color : Rgba) -> Object {
 ///|
 async fn animate() -> Unit {
   let frame_prefix = "animation_group_720p60"
+  let frame_dir = "output/frames"
   let movie_path = "output/animation_group_720p60.mp4"
   let scene = Scene::new(config=SceneConfig::new(frame_rate=60))
   let writer = MovieWriter::mp4(
@@ -55,7 +56,7 @@ async fn animate() -> Unit {
         background=Rgba::black(),
       ),
     ),
-    output_dir="output",
+    output_dir=frame_dir,
     frame_prefix~,
     frame_padding=4,
     frame_rate=60,
@@ -111,7 +112,7 @@ async fn animate() -> Unit {
   ])
   writer.finish()
   println(
-    "wrote \{writer.frame_count()} frames to output/\{frame_prefix}_*.png and \{movie_path}",
+    "wrote \{writer.frame_count()} frames to \{frame_dir}/\{frame_prefix}_*.png and \{movie_path}",
   )
 }
 

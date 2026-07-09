@@ -10,7 +10,7 @@ pub struct MovieWriter {
 ///|
 pub fn MovieWriter::mp4(
   renderer? : CairoRenderer = CairoRenderer::new(),
-  output_dir? : String = "output",
+  output_dir? : String = "output/frames",
   frame_prefix? : String = "frame",
   frame_padding? : Int = 4,
   play_config? : @scene.PlayConfig = @scene.PlayConfig::image_sequence(),

@@ -42,6 +42,100 @@ pub fn Circle::point_at_angle(self : Circle, angle : Double) -> Vec3 {
 }
 
 ///|
+pub(all) struct Line {
+  start : Vec3
+  end : Vec3
+  style : ShapeStyle
+}
+
+///|
+pub fn Line::new(
+  start? : Vec3 = Vec3::new(x=-1.0, y=0.0),
+  end? : Vec3 = Vec3::new(x=1.0, y=0.0),
+  style? : ShapeStyle = ShapeStyle::default(),
+) -> Line {
+  { start, end, style }
+}
+
+///|
+pub fn Line::path(self : Line) -> Path3D {
+  let path = Path3D::empty()
+  path.move_to(self.start)
+  path.line_to(self.end)
+  path
+}
+
+///|
+pub impl IntoObject for Line with fn to_object(self, id? : String = "") -> Object {
+  Object::path(self.path(), style=self.style, id~)
+}
+
+///|
+pub(all) struct Polygon {
+  vertices : Array[Vec3]
+  style : ShapeStyle
+}
+
+///|
+pub fn Polygon::new(
+  vertices : Array[Vec3],
+  style? : ShapeStyle = ShapeStyle::default(),
+) -> Polygon {
+  { vertices: vertices.copy(), style }
+}
+
+///|
+pub fn Polygon::path(self : Polygon) -> Path3D {
+  polygon_path(self.vertices)
+}
+
+///|
+pub impl IntoObject for Polygon with fn to_object(self, id? : String = "") -> Object {
+  Object::path(self.path(), style=self.style, id~)
+}
+
+///|
+pub(all) struct Rectangle {
+  width : Double
+  height : Double
+  style : ShapeStyle
+}
+
+///|
+pub fn Rectangle::new(
+  width? : Double = 4.0,
+  height? : Double = 2.0,
+  style? : ShapeStyle = ShapeStyle::default(),
+) -> Rectangle {
+  { width, height, style }
+}
+
+///|
+pub fn Rectangle::polygon(self : Rectangle) -> Polygon {
+  let half_width = self.width / 2.0
+  let half_height = self.height / 2.0
+  Polygon::new(
+    [
+      Vec3::new(x=0.0 - half_width, y=0.0 - half_height),
+      Vec3::new(x=half_width, y=0.0 - half_height),
+      Vec3::new(x=half_width, y=half_height),
+      Vec3::new(x=0.0 - half_width, y=half_height),
+    ],
+    style=self.style,
+  )
+}
+
+///|
+pub fn Rectangle::path(self : Rectangle) -> Path3D {
+  self.polygon().path()
+}
+
+///|
+pub impl IntoObject for Rectangle with fn to_object(self, id? : String = "") -> Object {
+  Object::path(self.path(), style=self.style, id~)
+}
+
+///|
 pub(all) struct Square {
   side_length : Double
   style : ShapeStyle
@@ -57,17 +151,87 @@ pub fn Square::new(
 
 ///|
 pub fn Square::path(self : Square) -> Path3D {
-  let half = self.side_length / 2.0
-  let path = Path3D::empty()
-  path.move_to(Vec3::new(x=0.0 - half, y=0.0 - half))
-  path.line_to(Vec3::new(x=half, y=0.0 - half))
-  path.line_to(Vec3::new(x=half, y=half))
-  path.line_to(Vec3::new(x=0.0 - half, y=half))
-  path.close()
-  path
+  Rectangle::new(
+    width=self.side_length,
+    height=self.side_length,
+    style=self.style,
+  ).path()
 }
 
 ///|
 pub impl IntoObject for Square with fn to_object(self, id? : String = "") -> Object {
   Object::path(self.path(), style=self.style, id~)
+}
+
+///|
+pub(all) struct Dot {
+  point : Vec3
+  radius : Double
+  segments : Int
+  style : ShapeStyle
+}
+
+///|
+pub fn Dot::new(
+  point? : Vec3 = Vec3::zero(),
+  radius? : Double = 0.08,
+  segments? : Int = 8,
+  style? : ShapeStyle = dot_default_style(),
+) -> Dot {
+  { point, radius, segments, style }
+}
+
+///|
+pub fn Dot::path(self : Dot) -> Path3D {
+  translate_path(
+    Circle::new(radius=self.radius, segments=self.segments, style=self.style).path(),
+    self.point,
+  )
+}
+
+///|
+pub impl IntoObject for Dot with fn to_object(self, id? : String = "") -> Object {
+  Object::path(self.path(), style=self.style, id~)
+}
+
+///|
+fn polygon_path(vertices : Array[Vec3]) -> Path3D {
+  let path = Path3D::empty()
+  match vertices.get(0) {
+    None => path
+    Some(first) => {
+      path.move_to(first)
+      for index in 1..<vertices.length() {
+        path.line_to(vertices[index])
+      }
+      if vertices.length() > 1 {
+        path.close()
+      }
+      path
+    }
+  }
+}
+
+///|
+fn dot_default_style() -> ShapeStyle {
+  ShapeStyle::filled(color=Rgba::white())
+}
+
+///|
+fn translate_path(path : Path3D, offset : Vec3) -> Path3D {
+  let translated = Path3D::empty()
+  for command in path.commands {
+    match command {
+      MoveTo(point) => translated.move_to(point.add(offset))
+      LineTo(point) => translated.line_to(point.add(offset))
+      CubicTo(handle1, handle2, anchor) =>
+        translated.cubic_to(
+          handle1.add(offset),
+          handle2.add(offset),
+          anchor.add(offset),
+        )
+      Close => translated.close()
+    }
+  }
+  translated
 }

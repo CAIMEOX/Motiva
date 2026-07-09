@@ -54,6 +54,25 @@ pub fn Circle::path(Self) -> Path3D
 pub fn Circle::point_at_angle(Self, Double) -> Vec3
 pub impl IntoObject for Circle
 
+pub(all) struct Dot {
+  point : Vec3
+  radius : Double
+  segments : Int
+  style : ShapeStyle
+}
+pub fn Dot::new(point? : Vec3, radius? : Double, segments? : Int, style? : ShapeStyle) -> Self
+pub fn Dot::path(Self) -> Path3D
+pub impl IntoObject for Dot
+
+pub(all) struct Line {
+  start : Vec3
+  end : Vec3
+  style : ShapeStyle
+}
+pub fn Line::new(start? : Vec3, end? : Vec3, style? : ShapeStyle) -> Self
+pub fn Line::path(Self) -> Path3D
+pub impl IntoObject for Line
+
 pub(all) enum Node {
   Empty
   Group(Array[Object])
@@ -112,6 +131,24 @@ pub(all) enum PathCommand {
   CubicTo(Vec3, Vec3, Vec3)
   Close
 }
+
+pub(all) struct Polygon {
+  vertices : Array[Vec3]
+  style : ShapeStyle
+}
+pub fn Polygon::new(Array[Vec3], style? : ShapeStyle) -> Self
+pub fn Polygon::path(Self) -> Path3D
+pub impl IntoObject for Polygon
+
+pub(all) struct Rectangle {
+  width : Double
+  height : Double
+  style : ShapeStyle
+}
+pub fn Rectangle::new(width? : Double, height? : Double, style? : ShapeStyle) -> Self
+pub fn Rectangle::path(Self) -> Path3D
+pub fn Rectangle::polygon(Self) -> Polygon
+pub impl IntoObject for Rectangle
 
 pub(all) struct Rgba {
   r : Double
