@@ -43,8 +43,8 @@ test "circle lowers to path object" {
     fail("Circle should have a default stroke color")
   }
   assert_close(color.r, 1.0)
-  assert_close(color.g, 0.0)
-  assert_close(color.b, 0.0)
+  assert_close(color.g, 1.0)
+  assert_close(color.b, 1.0)
 }
 
 ///|
@@ -116,8 +116,8 @@ test "square lowers to path object" {
     fail("Square should have a default stroke color")
   }
   assert_close(color.r, 1.0)
-  assert_close(color.g, 0.0)
-  assert_close(color.b, 0.0)
+  assert_close(color.g, 1.0)
+  assert_close(color.b, 1.0)
 }
 
 ///|

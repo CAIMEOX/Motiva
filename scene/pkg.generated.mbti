@@ -115,9 +115,9 @@ pub(all) struct PlayConfig {
   include_start_frame : Bool
   include_end_frame : Bool
 }
-pub fn PlayConfig::default() -> Self
 pub fn PlayConfig::image_sequence() -> Self
 pub fn PlayConfig::new(include_start_frame? : Bool, include_end_frame? : Bool) -> Self
+pub impl Default for PlayConfig
 
 pub struct PlayPlan {
   // private fields
@@ -209,8 +209,8 @@ pub(all) struct SceneConfig {
   frame_rate : Double
   always_update_objects : Bool
 }
-pub fn SceneConfig::default() -> Self
 pub fn SceneConfig::new(frame_rate? : Double, always_update_objects? : Bool) -> Self
+pub impl Default for SceneConfig
 
 pub(all) struct SceneObject {
   object : @object.Object

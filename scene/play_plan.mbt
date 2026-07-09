@@ -13,7 +13,7 @@ pub fn PlayConfig::new(
 }
 
 ///|
-pub fn PlayConfig::default() -> PlayConfig {
+pub impl Default for PlayConfig with fn default() -> PlayConfig {
   PlayConfig::new()
 }
 

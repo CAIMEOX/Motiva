@@ -63,6 +63,7 @@ pub(all) struct Dot {
 pub fn Dot::new(point? : Vec3, radius? : Double, segments? : Int, style? : ShapeStyle) -> Self
 pub fn Dot::path(Self) -> Path3D
 pub impl IntoObject for Dot
+pub impl Default for Dot
 
 pub(all) struct Line {
   start : Vec3
@@ -93,6 +94,9 @@ pub fn Object::empty(id? : String) -> Self
 pub fn Object::group(Array[Self], id? : String) -> Self
 pub fn Object::new(node~ : Node, id? : String, transform? : Transform, z_index? : Double) -> Self
 pub fn Object::path(Path3D, style? : ShapeStyle, id? : String) -> Self
+pub fn Object::set_color(Self, Rgba) -> Self
+pub fn Object::set_fill(Self, color? : Rgba, opacity? : Double) -> Self
+pub fn Object::set_stroke(Self, color? : Rgba, width? : Double, opacity? : Double) -> Self
 pub fn Object::with_transform(Self, Transform) -> Self
 pub fn Object::with_z_index(Self, Double) -> Self
 pub impl IntoObject for Object
@@ -169,10 +173,13 @@ pub(all) struct ShapeStyle {
   stroke_opacity : Double
   stroke_width : Double
 }
-pub fn ShapeStyle::default() -> Self
 pub fn ShapeStyle::filled(color~ : Rgba) -> Self
 pub fn ShapeStyle::new(fill? : Rgba, fill_opacity? : Double, stroke? : Rgba, stroke_opacity? : Double, stroke_width? : Double) -> Self
+pub fn ShapeStyle::set_color(Self, Rgba) -> Self
+pub fn ShapeStyle::set_fill(Self, color? : Rgba, opacity? : Double) -> Self
+pub fn ShapeStyle::set_stroke(Self, color? : Rgba, width? : Double, opacity? : Double) -> Self
 pub fn ShapeStyle::stroked(color~ : Rgba, stroke_width? : Double) -> Self
+pub impl Default for ShapeStyle
 
 pub(all) struct Square {
   side_length : Double

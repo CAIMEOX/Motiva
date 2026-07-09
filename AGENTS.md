@@ -38,6 +38,9 @@ You can browse and install extra skills here:
   `Array`, should return `Unit`. Return `Self` only for functions that are
   conceptually pure value builders.
 
+- For type defaults, implement the standard `Default` trait instead of adding a
+  hand-written `pub fn Type::default()`.
+
 - Do not use `fail` for library/domain errors. `fail` raises an unstructured
   `Failure` and loses the error type. Define a specific `suberror`, raise its
   constructors, and annotate public APIs with the precise error type (for

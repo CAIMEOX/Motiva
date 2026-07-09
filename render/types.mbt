@@ -43,7 +43,7 @@ pub fn Camera::new(
 }
 
 ///|
-pub fn Camera::default() -> Camera {
+pub impl Default for Camera with fn default() -> Camera {
   Camera::new()
 }
 

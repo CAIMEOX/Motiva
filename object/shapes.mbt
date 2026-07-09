@@ -173,12 +173,33 @@ pub(all) struct Dot {
 
 ///|
 pub fn Dot::new(
-  point? : Vec3 = Vec3::zero(),
-  radius? : Double = 0.08,
-  segments? : Int = 8,
-  style? : ShapeStyle = dot_default_style(),
+  point? : Vec3,
+  radius? : Double,
+  segments? : Int,
+  style? : ShapeStyle,
 ) -> Dot {
-  { point, radius, segments, style }
+  let defaults = Dot::default()
+  {
+    point: point.map_or(defaults.point, value => value),
+    radius: radius.map_or(defaults.radius, value => value),
+    segments: segments.map_or(defaults.segments, value => value),
+    style: style.map_or(defaults.style, value => value),
+  }
+}
+
+///|
+pub impl Default for Dot with fn default() -> Dot {
+  {
+    point: Vec3::zero(),
+    radius: 0.08,
+    segments: 8,
+    style: ShapeStyle::new(
+      fill=Rgba::white(),
+      fill_opacity=1.0,
+      stroke=Rgba::white(),
+      stroke_width=0.0,
+    ),
+  }
 }
 
 ///|
@@ -210,11 +231,6 @@ fn polygon_path(vertices : Array[Vec3]) -> Path3D {
       path
     }
   }
-}
-
-///|
-fn dot_default_style() -> ShapeStyle {
-  ShapeStyle::filled(color=Rgba::white())
 }
 
 ///|

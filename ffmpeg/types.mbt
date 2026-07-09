@@ -40,7 +40,7 @@ pub fn Ffmpeg::new(
 }
 
 ///|
-pub fn Ffmpeg::default() -> Ffmpeg {
+pub impl Default for Ffmpeg with fn default() -> Ffmpeg {
   Ffmpeg::new()
 }
 
@@ -228,6 +228,6 @@ pub fn GifOptions::new(
 }
 
 ///|
-pub fn GifOptions::default() -> GifOptions {
+pub impl Default for GifOptions with fn default() -> GifOptions {
   GifOptions::new()
 }

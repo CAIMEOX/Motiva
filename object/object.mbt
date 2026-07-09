@@ -53,6 +53,45 @@ pub fn Object::with_z_index(self : Object, z_index : Double) -> Object {
 }
 
 ///|
+pub fn Object::set_fill(
+  self : Object,
+  color? : Rgba,
+  opacity? : Double,
+) -> Object {
+  {
+    id: self.id,
+    transform: self.transform,
+    z_index: self.z_index,
+    node: self.node.set_fill(color?, opacity?),
+  }
+}
+
+///|
+pub fn Object::set_stroke(
+  self : Object,
+  color? : Rgba,
+  width? : Double,
+  opacity? : Double,
+) -> Object {
+  {
+    id: self.id,
+    transform: self.transform,
+    z_index: self.z_index,
+    node: self.node.set_stroke(color?, width?, opacity?),
+  }
+}
+
+///|
+pub fn Object::set_color(self : Object, color : Rgba) -> Object {
+  {
+    id: self.id,
+    transform: self.transform,
+    z_index: self.z_index,
+    node: self.node.set_color(color),
+  }
+}
+
+///|
 pub fn Object::bounds(self : Object) -> Aabb? {
   self.node.bounds().map(bounds => bounds.transform(self.transform))
 }
@@ -85,5 +124,39 @@ fn merge_bounds(a : Aabb?, b : Aabb?) -> Aabb? {
     (None, _) => b
     (Some(current), None) => Some(current)
     (Some(current), Some(next)) => Some(current.union(next))
+  }
+}
+
+///|
+fn Node::set_fill(self : Node, color? : Rgba, opacity? : Double) -> Node {
+  match self {
+    Empty => Empty
+    Path(path, style) => Path(path, style.set_fill(color?, opacity?))
+    Group(children) =>
+      Group(children.map(child => child.set_fill(color?, opacity?)))
+  }
+}
+
+///|
+fn Node::set_stroke(
+  self : Node,
+  color? : Rgba,
+  width? : Double,
+  opacity? : Double,
+) -> Node {
+  match self {
+    Empty => Empty
+    Path(path, style) => Path(path, style.set_stroke(color?, width?, opacity?))
+    Group(children) =>
+      Group(children.map(child => child.set_stroke(color?, width?, opacity?)))
+  }
+}
+
+///|
+fn Node::set_color(self : Node, color : Rgba) -> Node {
+  match self {
+    Empty => Empty
+    Path(path, style) => Path(path, style.set_color(color))
+    Group(children) => Group(children.map(child => child.set_color(color)))
   }
 }

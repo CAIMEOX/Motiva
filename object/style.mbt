@@ -65,6 +65,56 @@ pub fn ShapeStyle::filled(color~ : Rgba) -> ShapeStyle {
 }
 
 ///|
-pub fn ShapeStyle::default() -> ShapeStyle {
-  ShapeStyle::stroked(color=Rgba::red())
+pub fn ShapeStyle::set_fill(
+  self : ShapeStyle,
+  color? : Rgba,
+  opacity? : Double,
+) -> ShapeStyle {
+  {
+    fill: resolve_rgba(self.fill, color),
+    fill_opacity: opacity.map_or(self.fill_opacity, value => value),
+    stroke: self.stroke,
+    stroke_opacity: self.stroke_opacity,
+    stroke_width: self.stroke_width,
+  }
+}
+
+///|
+pub fn ShapeStyle::set_stroke(
+  self : ShapeStyle,
+  color? : Rgba,
+  width? : Double,
+  opacity? : Double,
+) -> ShapeStyle {
+  {
+    fill: self.fill,
+    fill_opacity: self.fill_opacity,
+    stroke: resolve_rgba(self.stroke, color),
+    stroke_opacity: opacity.map_or(self.stroke_opacity, value => value),
+    stroke_width: width.map_or(self.stroke_width, value => value),
+  }
+}
+
+///|
+pub fn ShapeStyle::set_color(self : ShapeStyle, color : Rgba) -> ShapeStyle {
+  {
+    fill: Some(color),
+    fill_opacity: self.fill_opacity,
+    stroke: Some(color),
+    stroke_opacity: self.stroke_opacity,
+    stroke_width: self.stroke_width,
+  }
+}
+
+///|
+pub impl Default for ShapeStyle with fn default() -> ShapeStyle {
+  ShapeStyle::stroked(color=Rgba::white())
+}
+
+///|
+fn resolve_rgba(current : Rgba?, next : Rgba?) -> Rgba? {
+  match (current, next) {
+    (_, Some(color)) => Some(color)
+    (color, None) => color
+  }
 }

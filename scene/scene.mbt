@@ -30,7 +30,7 @@ pub fn SceneConfig::new(
 }
 
 ///|
-pub fn SceneConfig::default() -> SceneConfig {
+pub impl Default for SceneConfig with fn default() -> SceneConfig {
   SceneConfig::new()
 }
 
