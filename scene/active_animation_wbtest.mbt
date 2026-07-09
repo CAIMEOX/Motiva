@@ -136,6 +136,51 @@ test "create samples a path prefix over time" {
 }
 
 ///|
+test "draw border then fill draws outline before restoring fill" {
+  let scene = Scene::new()
+  let style = @object.ShapeStyle::new(
+    fill=@object.Rgba::red(),
+    fill_opacity=1.0,
+    stroke_width=0.0,
+  )
+  let circle = scene.object(@object.Circle::new(radius=2.0, segments=8, style~))
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::draw_border_then_fill(circle, run_time=2.0),
+  )
+  assert_true(active.lifecycle.introducer)
+  guard patch_put_object(active.sample(0.25), circle) is Some(border) else {
+    fail("first half should put a partially drawn outline object")
+  }
+  guard border.node is Path(border_path, border_style) else {
+    fail("outline sample should remain a path")
+  }
+  assert_eq(border_path.eval().curve_count(), 4)
+  assert_close(border_style.fill_opacity, 0.0)
+  guard border_style.stroke is Some(stroke) else {
+    fail("outline should fall back to fill color when no stroke is set")
+  }
+  assert_close(stroke.r, 1.0)
+  assert_close(border_style.stroke_width, 4.0)
+  guard patch_put_object(active.sample(0.75), circle) is Some(filling) else {
+    fail("second half should put a full path with interpolated fill")
+  }
+  guard filling.node is Path(filling_path, filling_style) else {
+    fail("filling sample should remain a path")
+  }
+  assert_eq(filling_path.eval().curve_count(), 8)
+  assert_close(filling_style.fill_opacity, 0.5)
+  guard patch_put_object(active.finish_patch(), circle) is Some(finish) else {
+    fail("finish patch should restore the final object")
+  }
+  guard finish.node is Path(_, finish_style) else {
+    fail("finish object should remain a path")
+  }
+  assert_close(finish_style.fill_opacity, 1.0)
+  assert_true(finish_style.stroke is None)
+}
+
+///|
 test "wait active animation has no affected ids and empty patches" {
   let scene = Scene::new()
   let active = ActiveAnimation::compile(scene, Animation::wait(1.0))

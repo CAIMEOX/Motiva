@@ -76,6 +76,7 @@ pub fn ObjectOp::apply(
 pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
+  DrawBorderThenFill(ObjectId)
   FadeIn(ObjectId)
   FadeOut(ObjectId)
   Transform(ObjectId, @object.Object)
@@ -104,6 +105,14 @@ pub fn Animation::wait(duration : Double) -> Animation {
 ///|
 pub fn Animation::create(id : ObjectId, run_time? : Double = 1.0) -> Animation {
   Animation::new(Create(id), timing=Timing::new(run_time~))
+}
+
+///|
+pub fn Animation::draw_border_then_fill(
+  id : ObjectId,
+  run_time? : Double = 2.0,
+) -> Animation {
+  Animation::new(DrawBorderThenFill(id), timing=Timing::new(run_time~))
 }
 
 ///|

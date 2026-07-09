@@ -22,12 +22,15 @@ pub(all) struct Camera {
 pub fn Camera::new(
   pixel_width? : Int = 1280,
   pixel_height? : Int = 720,
-  frame_width? : Double = 14.222222222222221,
-  frame_height? : Double = 8.0,
+  frame_width? : Double,
+  frame_height? : Double,
   frame_center? : @object.Vec3 = @object.Vec3::zero(),
   background? : @object.Rgba = @object.Rgba::black(),
   cairo_line_width_multiple? : Double = 0.01,
 ) -> Camera {
+  let (frame_width, frame_height) = resolve_frame_size(
+    pixel_width, pixel_height, frame_width, frame_height,
+  )
   {
     pixel_width,
     pixel_height,
@@ -42,6 +45,23 @@ pub fn Camera::new(
 ///|
 pub fn Camera::default() -> Camera {
   Camera::new()
+}
+
+///|
+fn resolve_frame_size(
+  pixel_width : Int,
+  pixel_height : Int,
+  frame_width : Double?,
+  frame_height : Double?,
+) -> (Double, Double) {
+  let default_frame_height = 8.0
+  let aspect = pixel_width.to_double() / pixel_height.to_double()
+  match (frame_width, frame_height) {
+    (None, None) => (default_frame_height * aspect, default_frame_height)
+    (Some(width), None) => (width, width / aspect)
+    (None, Some(height)) => (height * aspect, height)
+    (Some(width), Some(height)) => (width, height)
+  }
 }
 
 ///|

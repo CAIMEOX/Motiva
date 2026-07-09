@@ -24,6 +24,7 @@ pub(all) struct Animation {
 }
 pub fn Animation::apply_ops(ObjectId, Array[ObjectOp], run_time? : Double) -> Self
 pub fn Animation::create(ObjectId, run_time? : Double) -> Self
+pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double) -> Self
 pub fn Animation::fade_in(ObjectId, run_time? : Double) -> Self
 pub fn Animation::fade_out(ObjectId, run_time? : Double) -> Self
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
@@ -53,6 +54,7 @@ pub impl IntoAnimation for AnimationBuilder
 pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
+  DrawBorderThenFill(ObjectId)
   FadeIn(ObjectId)
   FadeOut(ObjectId)
   Transform(ObjectId, @object.Object)

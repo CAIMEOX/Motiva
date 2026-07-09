@@ -21,6 +21,11 @@ priv enum ActiveAnimationKind {
   ActiveWait
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
   ActiveReveal(ObjectId, source~ : @object.Object, mode~ : RevealMode)
+  ActiveDrawBorderThenFill(
+    ObjectId,
+    source~ : @object.Object,
+    outline~ : @object.Object
+  )
   ActiveRemoval(ObjectId, source~ : @object.Object, mode~ : RemovalMode)
 }
 
@@ -57,6 +62,12 @@ fn ActiveAnimation::compile(
         id,
         source=scene.require_object(id).object,
         mode=CreateReveal,
+        timing=animation.timing,
+      )
+    DrawBorderThenFill(id) =>
+      ActiveAnimation::draw_border_then_fill(
+        id,
+        source=scene.require_object(id).object,
         timing=animation.timing,
       )
     FadeIn(id) =>
@@ -130,6 +141,27 @@ fn ActiveAnimation::reveal(
 }
 
 ///|
+fn ActiveAnimation::draw_border_then_fill(
+  id : ObjectId,
+  source~ : @object.Object,
+  timing~ : Timing,
+) -> ActiveAnimation {
+  {
+    kind: ActiveDrawBorderThenFill(
+      id,
+      source~,
+      outline=make_outline_object(source),
+    ),
+    timing,
+    lifecycle: AnimationLifecycle::new(
+      introducer=true,
+      remover=false,
+      mutates_object=true,
+    ),
+  }
+}
+
+///|
 fn ActiveAnimation::removal(
   id : ObjectId,
   source~ : @object.Object,
@@ -156,8 +188,10 @@ fn ActiveAnimation::run_time(self : ActiveAnimation) -> Double {
 fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
   match self.kind {
     ActiveWait => []
-    ActiveTransform(id, ..) | ActiveReveal(id, ..) | ActiveRemoval(id, ..) =>
-      [id]
+    ActiveTransform(id, ..)
+    | ActiveReveal(id, ..)
+    | ActiveDrawBorderThenFill(id, ..)
+    | ActiveRemoval(id, ..) => [id]
   }
 }
 
@@ -174,6 +208,11 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
     ActiveReveal(id, source~, mode~) =>
       FramePatch::all([
         FramePatch::put(id, sample_reveal(source, mode, 0.0)),
+        FramePatch::ensure_visible(id),
+      ])
+    ActiveDrawBorderThenFill(id, source~, outline~) =>
+      FramePatch::all([
+        FramePatch::put(id, sample_draw_border_then_fill(source, outline, 0.0)),
         FramePatch::ensure_visible(id),
       ])
     ActiveRemoval(id, source~, ..) =>
@@ -203,6 +242,14 @@ fn ActiveAnimation::sample(
       ActiveReveal(id, source~, mode~) =>
         FramePatch::all([
           FramePatch::put(id, sample_reveal(source, mode, alpha)),
+          FramePatch::ensure_visible(id),
+        ])
+      ActiveDrawBorderThenFill(id, source~, outline~) =>
+        FramePatch::all([
+          FramePatch::put(
+            id,
+            sample_draw_border_then_fill(source, outline, alpha),
+          ),
           FramePatch::ensure_visible(id),
         ])
       ActiveRemoval(id, source~, mode~) =>
@@ -289,6 +336,66 @@ fn sample_create_path(
 ) -> @object.Path3D {
   source.eval().prefix(alpha).to_path() catch {
     _ => choose_endpoint(@object.Path3D::empty(), source, alpha)
+  }
+}
+
+///|
+fn sample_draw_border_then_fill(
+  source : @object.Object,
+  outline : @object.Object,
+  alpha : Double,
+) -> @object.Object {
+  if alpha < 0.5 {
+    sample_create_object(outline, alpha * 2.0)
+  } else {
+    interpolate_object(outline, source, (alpha - 0.5) * 2.0)
+  }
+}
+
+///|
+fn make_outline_object(source : @object.Object) -> @object.Object {
+  @object.Object::new(
+    node=make_outline_node(source.node),
+    id=source.id,
+    transform=source.transform,
+    z_index=source.z_index,
+  )
+}
+
+///|
+fn make_outline_node(source : @object.Node) -> @object.Node {
+  match source {
+    Empty => Empty
+    Group(children) => Group(children.map(child => make_outline_object(child)))
+    Path(path, style) => Path(path, make_outline_style(style))
+  }
+}
+
+///|
+fn make_outline_style(style : @object.ShapeStyle) -> @object.ShapeStyle {
+  {
+    fill: style.fill,
+    fill_opacity: 0.0,
+    stroke: make_outline_stroke(style),
+    stroke_opacity: style.stroke_opacity,
+    stroke_width: make_outline_stroke_width(style),
+  }
+}
+
+///|
+fn make_outline_stroke(style : @object.ShapeStyle) -> @object.Rgba? {
+  match (style.stroke, style.fill) {
+    (Some(stroke), _) => Some(stroke)
+    (None, fill) => fill
+  }
+}
+
+///|
+fn make_outline_stroke_width(style : @object.ShapeStyle) -> Double {
+  if style.stroke_width <= 0.0 {
+    4.0
+  } else {
+    style.stroke_width
   }
 }
 

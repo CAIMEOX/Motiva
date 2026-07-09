@@ -72,6 +72,7 @@ pub fn Object::new(node~ : Node, id? : String, transform? : Transform, z_index? 
 pub fn Object::path(Path3D, style? : ShapeStyle, id? : String) -> Self
 pub fn Object::with_transform(Self, Transform) -> Self
 pub fn Object::with_z_index(Self, Double) -> Self
+pub impl IntoObject for Object
 
 pub(all) struct Path3D {
   commands : Array[PathCommand]

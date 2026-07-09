@@ -33,6 +33,19 @@ test "snapshot separates foreground from main draw items" {
 }
 
 ///|
+test "camera derives missing frame dimension from pixel aspect" {
+  let wide = Camera::new(pixel_width=1280, pixel_height=720, frame_width=6.0)
+  assert_render_close(wide.frame_width, 6.0)
+  assert_render_close(wide.frame_height, 3.375)
+  let tall = Camera::new(pixel_width=1280, pixel_height=720, frame_height=4.0)
+  assert_render_close(tall.frame_width, 64.0 / 9.0)
+  assert_render_close(tall.frame_height, 4.0)
+  let square = Camera::new(pixel_width=64, pixel_height=64)
+  assert_render_close(square.frame_width, 8.0)
+  assert_render_close(square.frame_height, 8.0)
+}
+
+///|
 test "cairo renderer renders visible path objects into argb32 bytes" {
   let scene = @scene.Scene::new()
   let style = @object.ShapeStyle::filled(color=@object.Rgba::white())

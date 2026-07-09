@@ -18,7 +18,6 @@ async fn animate() -> Unit {
         pixel_width=1280,
         pixel_height=720,
         frame_width=6.0,
-        frame_height=4.0,
         background=Rgba::black(),
       ),
     ),

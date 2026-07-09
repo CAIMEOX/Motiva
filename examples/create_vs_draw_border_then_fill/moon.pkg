@@ -1,0 +1,17 @@
+import {
+  "CAIMEOX/Motiva/object",
+  "CAIMEOX/Motiva/render",
+  "CAIMEOX/Motiva/scene",
+  "moonbitlang/async",
+}
+
+supported_targets = "+native"
+
+options(
+  "is-main": true,
+  link: {
+    "native": {
+      "cc-link-flags": "-L/opt/homebrew/Cellar/cairo/1.18.4/lib -lcairo",
+    },
+  },
+)
