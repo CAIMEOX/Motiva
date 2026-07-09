@@ -1,3 +1,4 @@
 import {
   "CAIMEOX/Motiva/object",
+  "moonbitlang/core/math",
 }

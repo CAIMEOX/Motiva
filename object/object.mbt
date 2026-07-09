@@ -58,6 +58,16 @@ pub fn Object::bounds(self : Object) -> Aabb? {
 }
 
 ///|
+pub fn Object::center(self : Object) -> Vec3 {
+  self.critical_point(Vec3::zero())
+}
+
+///|
+pub fn Object::critical_point(self : Object, direction : Vec3) -> Vec3 {
+  self.bounds().map_or(Vec3::zero(), bounds => bounds.critical_point(direction))
+}
+
+///|
 pub fn Node::bounds(self : Node) -> Aabb? {
   match self {
     Empty => None

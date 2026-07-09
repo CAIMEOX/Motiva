@@ -153,6 +153,39 @@ test "3d transform applies translation scale and z rotation" {
 }
 
 ///|
+test "object critical point uses transformed bounds" {
+  let square = into_object(Square::new(side_length=4.0)).with_transform(
+    Transform::translate(Vec3::new(x=1.0, y=-1.0, z=3.0)),
+  )
+  assert_point_close(square.center(), Vec3::new(x=1.0, y=-1.0, z=3.0))
+  assert_point_close(
+    square.critical_point(Vec3::new(x=1.0, y=0.0, z=0.0)),
+    Vec3::new(x=3.0, y=-1.0, z=3.0),
+  )
+  assert_point_close(
+    square.critical_point(Vec3::new(x=-1.0, y=1.0, z=0.0)),
+    Vec3::new(x=-1.0, y=1.0, z=3.0),
+  )
+}
+
+///|
+test "rotate_about rotates around a stable pivot" {
+  let transform = Transform::rotate_about(
+    angle=@math.PI / 2.0,
+    axis=Vec3::unit_z(),
+    point=Vec3::new(x=1.0, y=1.0),
+  )
+  assert_point_close(
+    transform.apply_point(Vec3::new(x=1.0, y=1.0)),
+    Vec3::new(x=1.0, y=1.0),
+  )
+  assert_point_close(
+    transform.apply_point(Vec3::new(x=2.0, y=1.0)),
+    Vec3::new(x=1.0, y=2.0),
+  )
+}
+
+///|
 test "square path eval lowers lines to cubic point buffer" {
   let buffer = Square::new(side_length=4.0).path().eval()
   assert_eq(buffer.curve_count(), 4)

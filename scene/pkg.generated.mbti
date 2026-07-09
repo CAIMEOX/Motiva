@@ -28,6 +28,7 @@ pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double) -> Self
 pub fn Animation::fade_in(ObjectId, run_time? : Double) -> Self
 pub fn Animation::fade_out(ObjectId, run_time? : Double) -> Self
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
+pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double) -> Self
 pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, name? : String) -> Self
 pub fn Animation::wait(Double) -> Self
 pub fn Animation::with_run_time(Self, Double) -> Self
@@ -55,6 +56,7 @@ pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
+  Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId)
   FadeOut(ObjectId)
   Transform(ObjectId, @object.Object)
@@ -121,6 +123,14 @@ pub(all) struct PlayWriter {
 }
 pub fn PlayWriter::new((Scene, Array[Animation]) -> Unit raise SceneError) -> Self
 pub fn PlayWriter::write(Self, Scene, Array[Animation]) -> Unit raise SceneError
+
+pub(all) struct RotationSpec {
+  angle : Double
+  axis : @object.Vec3
+  about_point : @object.Vec3?
+  about_edge : @object.Vec3?
+}
+pub fn RotationSpec::new(angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3) -> Self
 
 pub(all) struct Scene {
   mut next_id : Int

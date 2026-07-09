@@ -95,6 +95,49 @@ test "active transform morphs incompatible path commands through point buffer" {
 }
 
 ///|
+test "active rotate samples circular motion instead of matrix lerp" {
+  let scene = Scene::new()
+  let square = scene.object(@object.Square::new(side_length=2.0))
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::rotate(square, angle=@math.PI, run_time=2.0),
+  )
+  guard active.affected_ids().get(0) is Some(id) else {
+    fail("rotate animation should report affected id")
+  }
+  assert_true(id == square)
+  guard patch_put_object(active.sample(0.5), square) is Some(sampled) else {
+    fail("rotate sample should put a sampled object")
+  }
+  let point = sampled.transform.apply_point(@object.Vec3::new(x=1.0, y=0.0))
+  assert_close(point.x, 0.0)
+  assert_close(point.y, 1.0)
+}
+
+///|
+test "active rotate can resolve about edge from object bounds" {
+  let scene = Scene::new()
+  let square = scene.object(@object.Square::new(side_length=2.0))
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::rotate(
+      square,
+      angle=@math.PI / 2.0,
+      about_edge=@object.Vec3::new(x=1.0, y=0.0),
+    ),
+  )
+  guard patch_put_object(active.sample(1.0), square) is Some(sampled) else {
+    fail("rotate sample should put a sampled object")
+  }
+  let pivot = sampled.transform.apply_point(@object.Vec3::new(x=1.0, y=0.0))
+  assert_close(pivot.x, 1.0)
+  assert_close(pivot.y, 0.0)
+  let left = sampled.transform.apply_point(@object.Vec3::new(x=-1.0, y=0.0))
+  assert_close(left.x, 1.0)
+  assert_close(left.y, -2.0)
+}
+
+///|
 test "create samples a path prefix over time" {
   let scene = Scene::new()
   let square = scene.object(@object.Square::new(side_length=4.0))

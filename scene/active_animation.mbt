@@ -20,6 +20,7 @@ priv enum RemovalMode {
 priv enum ActiveAnimationKind {
   ActiveWait
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
+  ActiveRotate(ObjectId, start~ : @object.Object, spec~ : RotationSpec)
   ActiveReveal(ObjectId, source~ : @object.Object, mode~ : RevealMode)
   ActiveDrawBorderThenFill(
     ObjectId,
@@ -70,6 +71,13 @@ fn ActiveAnimation::compile(
         source=scene.require_object(id).object,
         timing=animation.timing,
       )
+    Rotate(id, spec) =>
+      ActiveAnimation::rotate(
+        id,
+        start=scene.require_object(id).object,
+        spec~,
+        timing=animation.timing,
+      )
     FadeIn(id) =>
       ActiveAnimation::reveal(
         id,
@@ -113,6 +121,24 @@ fn ActiveAnimation::transform(
 ) -> ActiveAnimation {
   {
     kind: ActiveTransform(id, start~, target~),
+    timing,
+    lifecycle: AnimationLifecycle::new(
+      introducer=false,
+      remover=false,
+      mutates_object=true,
+    ),
+  }
+}
+
+///|
+fn ActiveAnimation::rotate(
+  id : ObjectId,
+  start~ : @object.Object,
+  spec~ : RotationSpec,
+  timing~ : Timing,
+) -> ActiveAnimation {
+  {
+    kind: ActiveRotate(id, start~, spec~),
     timing,
     lifecycle: AnimationLifecycle::new(
       introducer=false,
@@ -189,6 +215,7 @@ fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
   match self.kind {
     ActiveWait => []
     ActiveTransform(id, ..)
+    | ActiveRotate(id, ..)
     | ActiveReveal(id, ..)
     | ActiveDrawBorderThenFill(id, ..)
     | ActiveRemoval(id, ..) => [id]
@@ -201,6 +228,11 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
   match self.kind {
     ActiveWait => FramePatch::empty()
     ActiveTransform(id, start~, ..) =>
+      FramePatch::all([
+        FramePatch::put(id, start),
+        FramePatch::ensure_visible(id),
+      ])
+    ActiveRotate(id, start~, ..) =>
       FramePatch::all([
         FramePatch::put(id, start),
         FramePatch::ensure_visible(id),
@@ -237,6 +269,11 @@ fn ActiveAnimation::sample(
       ActiveTransform(id, start~, target~) =>
         FramePatch::all([
           FramePatch::put(id, interpolate_object(start, target, alpha)),
+          FramePatch::ensure_visible(id),
+        ])
+      ActiveRotate(id, start~, spec~) =>
+        FramePatch::all([
+          FramePatch::put(id, sample_rotate_object(start, spec, alpha)),
           FramePatch::ensure_visible(id),
         ])
       ActiveReveal(id, source~, mode~) =>
@@ -336,6 +373,33 @@ fn sample_create_path(
 ) -> @object.Path3D {
   source.eval().prefix(alpha).to_path() catch {
     _ => choose_endpoint(@object.Path3D::empty(), source, alpha)
+  }
+}
+
+///|
+fn sample_rotate_object(
+  start : @object.Object,
+  spec : RotationSpec,
+  alpha : Double,
+) -> @object.Object {
+  let point = resolve_rotation_about_point(spec, start)
+  let transform = @object.Transform::rotate_about(
+    angle=spec.angle * alpha,
+    axis=spec.axis,
+    point~,
+  )
+  start.with_transform(start.transform.then(transform))
+}
+
+///|
+fn resolve_rotation_about_point(
+  spec : RotationSpec,
+  object : @object.Object,
+) -> @object.Vec3 {
+  match (spec.about_point, spec.about_edge) {
+    (Some(point), _) => point
+    (None, Some(edge)) => object.critical_point(edge)
+    (None, None) => object.center()
   }
 }
 

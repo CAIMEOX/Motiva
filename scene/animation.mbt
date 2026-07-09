@@ -9,6 +9,24 @@ pub fn Timing::new(run_time? : Double = 1.0) -> Timing {
 }
 
 ///|
+pub(all) struct RotationSpec {
+  angle : Double
+  axis : @object.Vec3
+  about_point : @object.Vec3?
+  about_edge : @object.Vec3?
+}
+
+///|
+pub fn RotationSpec::new(
+  angle? : Double = @math.PI,
+  axis? : @object.Vec3 = @object.Vec3::unit_z(),
+  about_point? : @object.Vec3,
+  about_edge? : @object.Vec3,
+) -> RotationSpec {
+  { angle, axis, about_point, about_edge }
+}
+
+///|
 pub(all) enum ObjectOp {
   ApplyTransform(@object.Transform)
   SetTransform(@object.Transform)
@@ -77,6 +95,7 @@ pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
+  Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId)
   FadeOut(ObjectId)
   Transform(ObjectId, @object.Object)
@@ -113,6 +132,19 @@ pub fn Animation::draw_border_then_fill(
   run_time? : Double = 2.0,
 ) -> Animation {
   Animation::new(DrawBorderThenFill(id), timing=Timing::new(run_time~))
+}
+
+///|
+pub fn Animation::rotate(
+  id : ObjectId,
+  angle? : Double = @math.PI,
+  axis? : @object.Vec3 = @object.Vec3::unit_z(),
+  about_point? : @object.Vec3,
+  about_edge? : @object.Vec3,
+  run_time? : Double = 1.0,
+) -> Animation {
+  let spec : RotationSpec = { angle, axis, about_point, about_edge }
+  Animation::new(Rotate(id, spec), timing=Timing::new(run_time~))
 }
 
 ///|

@@ -16,6 +16,11 @@ pub fn Vec3::zero() -> Vec3 {
 }
 
 ///|
+pub fn Vec3::unit_z() -> Vec3 {
+  { x: 0.0, y: 0.0, z: 1.0 }
+}
+
+///|
 pub fn Vec3::add(self : Vec3, other : Vec3) -> Vec3 {
   { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
 }
@@ -28,6 +33,31 @@ pub fn Vec3::sub(self : Vec3, other : Vec3) -> Vec3 {
 ///|
 pub fn Vec3::scale(self : Vec3, factor : Double) -> Vec3 {
   { x: self.x * factor, y: self.y * factor, z: self.z * factor }
+}
+
+///|
+pub fn Vec3::dot(self : Vec3, other : Vec3) -> Double {
+  self.x * other.x + self.y * other.y + self.z * other.z
+}
+
+///|
+pub fn Vec3::length_squared(self : Vec3) -> Double {
+  self.dot(self)
+}
+
+///|
+pub fn Vec3::length(self : Vec3) -> Double {
+  self.length_squared().sqrt()
+}
+
+///|
+pub fn Vec3::normalize_or(self : Vec3, fallback : Vec3) -> Vec3 {
+  let length = self.length()
+  if length <= 0.0 || length.is_nan() {
+    fallback
+  } else {
+    self.scale(1.0 / length)
+  }
 }
 
 ///|
@@ -111,6 +141,39 @@ pub fn Aabb::height(self : Aabb) -> Double {
 ///|
 pub fn Aabb::depth(self : Aabb) -> Double {
   self.max.z - self.min.z
+}
+
+///|
+pub fn Aabb::center(self : Aabb) -> Vec3 {
+  Vec3::new(
+    x=(self.min.x + self.max.x) / 2.0,
+    y=(self.min.y + self.max.y) / 2.0,
+    z=(self.min.z + self.max.z) / 2.0,
+  )
+}
+
+///|
+pub fn Aabb::critical_point(self : Aabb, direction : Vec3) -> Vec3 {
+  Vec3::new(
+    x=choose_critical_coordinate(self.min.x, self.max.x, direction.x),
+    y=choose_critical_coordinate(self.min.y, self.max.y, direction.y),
+    z=choose_critical_coordinate(self.min.z, self.max.z, direction.z),
+  )
+}
+
+///|
+fn choose_critical_coordinate(
+  min : Double,
+  max : Double,
+  key : Double,
+) -> Double {
+  if key < 0.0 {
+    min
+  } else if key > 0.0 {
+    max
+  } else {
+    (min + max) / 2.0
+  }
 }
 
 ///|
@@ -282,6 +345,39 @@ pub fn Transform::rotate_z(angle~ : Double) -> Transform {
 ///|
 pub fn Transform::rotate(angle~ : Double) -> Transform {
   Transform::rotate_z(angle~)
+}
+
+///|
+pub fn Transform::rotate_axis(angle~ : Double, axis~ : Vec3) -> Transform {
+  let unit = axis.normalize_or(Vec3::unit_z())
+  let c = @math.cos(angle)
+  let s = @math.sin(angle)
+  let t = 1.0 - c
+  {
+    m00: c + unit.x * unit.x * t,
+    m01: unit.x * unit.y * t - unit.z * s,
+    m02: unit.x * unit.z * t + unit.y * s,
+    m03: 0.0,
+    m10: unit.y * unit.x * t + unit.z * s,
+    m11: c + unit.y * unit.y * t,
+    m12: unit.y * unit.z * t - unit.x * s,
+    m13: 0.0,
+    m20: unit.z * unit.x * t - unit.y * s,
+    m21: unit.z * unit.y * t + unit.x * s,
+    m22: c + unit.z * unit.z * t,
+    m23: 0.0,
+  }
+}
+
+///|
+pub fn Transform::rotate_about(
+  angle~ : Double,
+  axis~ : Vec3,
+  point~ : Vec3,
+) -> Transform {
+  Transform::translate(point.scale(-1.0))
+  .then(Transform::rotate_axis(angle~, axis~))
+  .then(Transform::translate(point))
 }
 
 ///|
