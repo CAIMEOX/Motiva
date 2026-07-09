@@ -27,6 +27,14 @@ test "timing accepts custom rate functions" {
 }
 
 ///|
+test "auto timing resolves against natural run time" {
+  let timing = Timing::auto(lag_ratio=0.25)
+  assert_timing_close(timing.resolve_run_time(2.0), 2.0)
+  assert_timing_close(timing.alpha_at_run_time(1.0, 2.0), 0.5)
+  assert_timing_close(timing.lag_ratio, 0.25)
+}
+
+///|
 test "active animation samples builder custom rate function" {
   let scene = Scene::new()
   let square = scene.object(@object.Square::new())

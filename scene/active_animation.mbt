@@ -17,9 +17,17 @@ priv enum RemovalMode {
 }
 
 ///|
+priv struct ActiveChild {
+  animation : ActiveAnimation
+  start_time : Double
+  end_time : Double
+}
+
+///|
 priv enum ActiveAnimationKind {
   ActiveWait
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
+  ActiveScale(ObjectId, start~ : @object.Object, spec~ : ScaleSpec)
   ActiveRotate(ObjectId, start~ : @object.Object, spec~ : RotationSpec)
   ActiveReveal(ObjectId, source~ : @object.Object, mode~ : RevealMode)
   ActiveDrawBorderThenFill(
@@ -28,12 +36,14 @@ priv enum ActiveAnimationKind {
     outline~ : @object.Object
   )
   ActiveRemoval(ObjectId, source~ : @object.Object, mode~ : RemovalMode)
+  ActiveGroup(Array[ActiveChild], natural_run_time~ : Double)
 }
 
 ///|
 priv struct ActiveAnimation {
   kind : ActiveAnimationKind
   timing : Timing
+  run_time : Double
   lifecycle : AnimationLifecycle
 }
 
@@ -71,6 +81,13 @@ fn ActiveAnimation::compile(
         source=scene.require_object(id).object,
         timing=animation.timing,
       )
+    Scale(id, spec) =>
+      ActiveAnimation::scale(
+        id,
+        start=scene.require_object(id).object,
+        spec~,
+        timing=animation.timing,
+      )
     Rotate(id, spec) =>
       ActiveAnimation::rotate(
         id,
@@ -104,12 +121,19 @@ fn ActiveAnimation::compile(
       let target = ops.fold(init=start, (object, op) => op.apply(object))
       ActiveAnimation::transform(id, start~, target~, timing=animation.timing)
     }
+    Group(group) =>
+      ActiveAnimation::group(scene, group.animations, timing=animation.timing)
   }
 }
 
 ///|
 fn ActiveAnimation::wait(timing : Timing) -> ActiveAnimation {
-  { kind: ActiveWait, timing, lifecycle: AnimationLifecycle::passive() }
+  {
+    kind: ActiveWait,
+    timing,
+    run_time: timing.resolve_run_time(1.0),
+    lifecycle: AnimationLifecycle::passive(),
+  }
 }
 
 ///|
@@ -122,6 +146,26 @@ fn ActiveAnimation::transform(
   {
     kind: ActiveTransform(id, start~, target~),
     timing,
+    run_time: timing.resolve_run_time(1.0),
+    lifecycle: AnimationLifecycle::new(
+      introducer=false,
+      remover=false,
+      mutates_object=true,
+    ),
+  }
+}
+
+///|
+fn ActiveAnimation::scale(
+  id : ObjectId,
+  start~ : @object.Object,
+  spec~ : ScaleSpec,
+  timing~ : Timing,
+) -> ActiveAnimation {
+  {
+    kind: ActiveScale(id, start~, spec~),
+    timing,
+    run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::new(
       introducer=false,
       remover=false,
@@ -140,6 +184,7 @@ fn ActiveAnimation::rotate(
   {
     kind: ActiveRotate(id, start~, spec~),
     timing,
+    run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::new(
       introducer=false,
       remover=false,
@@ -158,6 +203,7 @@ fn ActiveAnimation::reveal(
   {
     kind: ActiveReveal(id, source~, mode~),
     timing,
+    run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::new(
       introducer=true,
       remover=false,
@@ -179,6 +225,7 @@ fn ActiveAnimation::draw_border_then_fill(
       outline=make_outline_object(source),
     ),
     timing,
+    run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::new(
       introducer=true,
       remover=false,
@@ -197,6 +244,7 @@ fn ActiveAnimation::removal(
   {
     kind: ActiveRemoval(id, source~, mode~),
     timing,
+    run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::new(
       introducer=false,
       remover=true,
@@ -206,8 +254,58 @@ fn ActiveAnimation::removal(
 }
 
 ///|
+fn ActiveAnimation::group(
+  scene : Scene,
+  animations : Array[Animation],
+  timing~ : Timing,
+) -> ActiveAnimation raise SceneError {
+  let children = animations.map(animation => {
+    ActiveAnimation::compile(scene, animation)
+  })
+  let scheduled = schedule_group_children(children, timing.lag_ratio)
+  let natural_run_time = scheduled.fold(init=0.0, (duration, child) => {
+    if child.end_time > duration {
+      child.end_time
+    } else {
+      duration
+    }
+  })
+  {
+    kind: ActiveGroup(scheduled, natural_run_time~),
+    timing,
+    run_time: timing.resolve_run_time(natural_run_time),
+    lifecycle: group_lifecycle(scheduled),
+  }
+}
+
+///|
+fn schedule_group_children(
+  animations : Array[ActiveAnimation],
+  lag_ratio : Double,
+) -> Array[ActiveChild] {
+  let scheduled : Array[ActiveChild] = []
+  let mut start_time = 0.0
+  for animation in animations {
+    let run_time = animation.run_time()
+    scheduled.push({ animation, start_time, end_time: start_time + run_time })
+    start_time += run_time * lag_ratio
+  }
+  scheduled
+}
+
+///|
+fn group_lifecycle(children : Array[ActiveChild]) -> AnimationLifecycle {
+  children.fold(init=AnimationLifecycle::passive(), (lifecycle, child) => {
+    introducer: lifecycle.introducer || child.animation.lifecycle.introducer,
+    remover: lifecycle.remover || child.animation.lifecycle.remover,
+    mutates_object: lifecycle.mutates_object ||
+    child.animation.lifecycle.mutates_object,
+  })
+}
+
+///|
 fn ActiveAnimation::run_time(self : ActiveAnimation) -> Double {
-  self.timing.run_time
+  self.run_time
 }
 
 ///|
@@ -215,10 +313,17 @@ fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
   match self.kind {
     ActiveWait => []
     ActiveTransform(id, ..)
+    | ActiveScale(id, ..)
     | ActiveRotate(id, ..)
     | ActiveReveal(id, ..)
     | ActiveDrawBorderThenFill(id, ..)
     | ActiveRemoval(id, ..) => [id]
+    ActiveGroup(children, ..) =>
+      children.fold(init=[], (ids, child) => {
+        let next = ids.copy()
+        next.append(child.animation.affected_ids())
+        next
+      })
   }
 }
 
@@ -228,6 +333,11 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
   match self.kind {
     ActiveWait => FramePatch::empty()
     ActiveTransform(id, start~, ..) =>
+      FramePatch::all([
+        FramePatch::put(id, start),
+        FramePatch::ensure_visible(id),
+      ])
+    ActiveScale(id, start~, ..) =>
       FramePatch::all([
         FramePatch::put(id, start),
         FramePatch::ensure_visible(id),
@@ -252,6 +362,8 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
         FramePatch::put(id, source),
         FramePatch::ensure_visible(id),
       ])
+    ActiveGroup(children, ..) =>
+      FramePatch::all(children.map(child => child.animation.begin_patch()))
   }
 }
 
@@ -269,6 +381,11 @@ fn ActiveAnimation::sample(
       ActiveTransform(id, start~, target~) =>
         FramePatch::all([
           FramePatch::put(id, interpolate_object(start, target, alpha)),
+          FramePatch::ensure_visible(id),
+        ])
+      ActiveScale(id, start~, spec~) =>
+        FramePatch::all([
+          FramePatch::put(id, sample_scale_object(start, spec, alpha)),
           FramePatch::ensure_visible(id),
         ])
       ActiveRotate(id, start~, spec~) =>
@@ -294,6 +411,7 @@ fn ActiveAnimation::sample(
           FramePatch::put(id, sample_removal(source, mode, alpha)),
           FramePatch::ensure_visible(id),
         ])
+      ActiveGroup(_, ..) => FramePatch::empty()
     }
   }
 }
@@ -303,19 +421,29 @@ fn ActiveAnimation::sample_at_time(
   self : ActiveAnimation,
   elapsed : Double,
 ) -> FramePatch {
-  self.sample(self.alpha_at_time(elapsed))
+  match self.kind {
+    ActiveGroup(children, natural_run_time~) =>
+      self.sample_group_at_time(children, natural_run_time, elapsed)
+    _ => self.sample(self.alpha_at_time(elapsed))
+  }
 }
 
 ///|
 fn ActiveAnimation::finish_patch(self : ActiveAnimation) -> FramePatch {
-  let final_sample = self.sample_at_time(self.run_time())
-  if self.lifecycle.remover {
-    match self.kind {
-      ActiveRemoval(id, ..) => final_sample.then(FramePatch::hide(id))
-      _ => final_sample
+  match self.kind {
+    ActiveGroup(children, ..) =>
+      FramePatch::all(children.map(child => child.animation.finish_patch()))
+    _ => {
+      let final_sample = self.sample_at_time(self.run_time())
+      if self.lifecycle.remover {
+        match self.kind {
+          ActiveRemoval(id, ..) => final_sample.then(FramePatch::hide(id))
+          _ => final_sample
+        }
+      } else {
+        final_sample
+      }
     }
-  } else {
-    final_sample
   }
 }
 
@@ -324,7 +452,33 @@ fn ActiveAnimation::alpha_at_time(
   self : ActiveAnimation,
   elapsed : Double,
 ) -> Double {
-  self.timing.alpha_at(elapsed)
+  self.timing.alpha_at_run_time(elapsed, self.run_time)
+}
+
+///|
+fn ActiveAnimation::sample_group_at_time(
+  self : ActiveAnimation,
+  children : Array[ActiveChild],
+  natural_run_time : Double,
+  elapsed : Double,
+) -> FramePatch {
+  let group_alpha = self.alpha_at_time(elapsed)
+  let group_time = group_alpha * natural_run_time
+  FramePatch::all(children.map(child => child.sample_at_group_time(group_time)))
+}
+
+///|
+fn ActiveChild::sample_at_group_time(
+  self : ActiveChild,
+  group_time : Double,
+) -> FramePatch {
+  if group_time < self.start_time {
+    FramePatch::empty()
+  } else if group_time > self.end_time {
+    self.animation.finish_patch()
+  } else {
+    self.animation.sample_at_time(group_time - self.start_time)
+  }
 }
 
 ///|
@@ -385,6 +539,46 @@ fn sample_rotate_object(
     point~,
   )
   start.with_transform(start.transform.then(transform))
+}
+
+///|
+fn sample_scale_object(
+  start : @object.Object,
+  spec : ScaleSpec,
+  alpha : Double,
+) -> @object.Object {
+  let point = resolve_scale_about_point(spec, start)
+  let transform = scale_about_transform(
+    sx=lerp_double(1.0, spec.sx, alpha),
+    sy=lerp_double(1.0, spec.sy, alpha),
+    sz=lerp_double(1.0, spec.sz, alpha),
+    point~,
+  )
+  start.with_transform(start.transform.then(transform))
+}
+
+///|
+fn resolve_scale_about_point(
+  spec : ScaleSpec,
+  object : @object.Object,
+) -> @object.Vec3 {
+  match (spec.about_point, spec.about_edge) {
+    (Some(point), _) => point
+    (None, Some(edge)) => object.critical_point(edge)
+    (None, None) => object.center()
+  }
+}
+
+///|
+fn scale_about_transform(
+  sx~ : Double,
+  sy~ : Double,
+  sz~ : Double,
+  point~ : @object.Vec3,
+) -> @object.Transform {
+  @object.Transform::translate(point.scale(-1.0))
+  .then(@object.Transform::scale(sx~, sy~, sz~))
+  .then(@object.Transform::translate(point))
 }
 
 ///|

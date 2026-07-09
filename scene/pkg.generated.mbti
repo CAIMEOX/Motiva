@@ -27,10 +27,14 @@ pub fn Animation::create(ObjectId, run_time? : Double, rate_func? : RateFunc, re
 pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::fade_in(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn[T : IntoAnimation] Animation::group(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
+pub fn[T : IntoAnimation] Animation::lagged_start(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
 pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::scale(ObjectId, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, name? : String) -> Self
 pub fn Animation::wait(Double) -> Self
+pub fn Animation::with_lag_ratio(Self, Double) -> Self
 pub fn Animation::with_rate_func(Self, RateFunc) -> Self
 pub fn Animation::with_run_time(Self, Double) -> Self
 pub impl IntoAnimation for Animation
@@ -44,7 +48,7 @@ pub fn AnimationBuilder::rotate(Self, angle~ : Double) -> Self
 pub fn AnimationBuilder::rotate_x(Self, angle~ : Double) -> Self
 pub fn AnimationBuilder::rotate_y(Self, angle~ : Double) -> Self
 pub fn AnimationBuilder::rotate_z(Self, angle~ : Double) -> Self
-pub fn AnimationBuilder::scale(Self, sx~ : Double, sy~ : Double, sz? : Double) -> Self
+pub fn AnimationBuilder::scale(Self, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3) -> Self
 pub fn AnimationBuilder::set_transform(Self, @object.Transform) -> Self
 pub fn AnimationBuilder::set_z_index(Self, Double) -> Self
 pub fn AnimationBuilder::shift(Self, @object.Vec3) -> Self
@@ -54,15 +58,22 @@ pub fn AnimationBuilder::with_rate_func(Self, RateFunc) -> Self
 pub fn AnimationBuilder::with_run_time(Self, Double) -> Self
 pub impl IntoAnimation for AnimationBuilder
 
+pub(all) struct AnimationGroup {
+  animations : Array[Animation]
+}
+pub fn[T : IntoAnimation] AnimationGroup::new(Array[T]) -> Self
+
 pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
+  Scale(ObjectId, ScaleSpec)
   Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId)
   FadeOut(ObjectId)
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
+  Group(AnimationGroup)
 }
 
 pub(all) struct FrameTime {
@@ -80,6 +91,7 @@ pub fn ObjectId::value(Self) -> Int
 
 pub(all) enum ObjectOp {
   ApplyTransform(@object.Transform)
+  ScaleOp(ScaleSpec)
   SetTransform(@object.Transform)
   SetZIndex(Double)
 }
@@ -88,7 +100,7 @@ pub fn ObjectOp::rotate(angle~ : Double) -> Self
 pub fn ObjectOp::rotate_x(angle~ : Double) -> Self
 pub fn ObjectOp::rotate_y(angle~ : Double) -> Self
 pub fn ObjectOp::rotate_z(angle~ : Double) -> Self
-pub fn ObjectOp::scale(sx~ : Double, sy~ : Double, sz? : Double) -> Self
+pub fn ObjectOp::scale(sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3) -> Self
 pub fn ObjectOp::set_transform(@object.Transform) -> Self
 pub fn ObjectOp::set_z_index(Double) -> Self
 pub fn ObjectOp::shift(@object.Vec3) -> Self
@@ -146,6 +158,21 @@ pub(all) struct RotationSpec {
 }
 pub fn RotationSpec::new(angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3) -> Self
 
+pub(all) enum RunTime {
+  Auto
+  Fixed(Double)
+}
+pub fn RunTime::resolve(Self, Double) -> Double
+
+pub(all) struct ScaleSpec {
+  sx : Double
+  sy : Double
+  sz : Double
+  about_point : @object.Vec3?
+  about_edge : @object.Vec3?
+}
+pub fn ScaleSpec::new(sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3) -> Self
+
 pub(all) struct Scene {
   mut next_id : Int
   objects : Map[ObjectId, SceneObject]
@@ -193,13 +220,18 @@ pub(all) struct SceneObject {
 }
 
 pub(all) struct Timing {
-  run_time : Double
+  run_time : RunTime
   rate_func : RateFunc
   reverse_rate_function : Bool
+  lag_ratio : Double
 }
 pub fn Timing::alpha_at(Self, Double) -> Double
-pub fn Timing::new(run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Timing::auto(rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
+pub fn Timing::new(run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Timing::raw_alpha_at(Self, Double) -> Double
+pub fn Timing::resolve_run_time(Self, Double) -> Double
+pub fn Timing::with_auto_run_time(Self) -> Self
+pub fn Timing::with_lag_ratio(Self, Double) -> Self
 pub fn Timing::with_rate_func(Self, RateFunc) -> Self
 pub fn Timing::with_run_time(Self, Double) -> Self
 

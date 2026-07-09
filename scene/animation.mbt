@@ -59,10 +59,25 @@ fn sigmoid(x : Double) -> Double {
 }
 
 ///|
+pub(all) enum RunTime {
+  Auto
+  Fixed(Double)
+}
+
+///|
+pub fn RunTime::resolve(self : RunTime, natural : Double) -> Double {
+  match self {
+    Auto => natural
+    Fixed(seconds) => seconds
+  }
+}
+
+///|
 pub(all) struct Timing {
-  run_time : Double
+  run_time : RunTime
   rate_func : RateFunc
   reverse_rate_function : Bool
+  lag_ratio : Double
 }
 
 ///|
@@ -70,22 +85,55 @@ pub fn Timing::new(
   run_time? : Double = 1.0,
   rate_func? : RateFunc = Linear,
   reverse_rate_function? : Bool = false,
+  lag_ratio? : Double = 0.0,
 ) -> Timing {
-  { run_time, rate_func, reverse_rate_function }
+  { run_time: Fixed(run_time), rate_func, reverse_rate_function, lag_ratio }
+}
+
+///|
+pub fn Timing::auto(
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+  lag_ratio? : Double = 0.0,
+) -> Timing {
+  { run_time: Auto, rate_func, reverse_rate_function, lag_ratio }
+}
+
+///|
+pub fn Timing::resolve_run_time(self : Timing, natural : Double) -> Double {
+  self.run_time.resolve(natural)
 }
 
 ///|
 pub fn Timing::raw_alpha_at(self : Timing, elapsed : Double) -> Double {
-  if self.run_time <= 0.0 {
+  self.raw_alpha_at_run_time(elapsed, self.resolve_run_time(1.0))
+}
+
+///|
+fn Timing::raw_alpha_at_run_time(
+  _self : Timing,
+  elapsed : Double,
+  run_time : Double,
+) -> Double {
+  if run_time <= 0.0 {
     1.0
   } else {
-    clamp_unit(elapsed / self.run_time)
+    clamp_unit(elapsed / run_time)
   }
 }
 
 ///|
 pub fn Timing::alpha_at(self : Timing, elapsed : Double) -> Double {
-  let raw_alpha = self.raw_alpha_at(elapsed)
+  self.alpha_at_run_time(elapsed, self.resolve_run_time(1.0))
+}
+
+///|
+fn Timing::alpha_at_run_time(
+  self : Timing,
+  elapsed : Double,
+  run_time : Double,
+) -> Double {
+  let raw_alpha = self.raw_alpha_at_run_time(elapsed, run_time)
   let local_alpha = if self.reverse_rate_function {
     1.0 - raw_alpha
   } else {
@@ -97,9 +145,20 @@ pub fn Timing::alpha_at(self : Timing, elapsed : Double) -> Double {
 ///|
 pub fn Timing::with_run_time(self : Timing, run_time : Double) -> Timing {
   {
-    run_time,
+    run_time: Fixed(run_time),
     rate_func: self.rate_func,
     reverse_rate_function: self.reverse_rate_function,
+    lag_ratio: self.lag_ratio,
+  }
+}
+
+///|
+pub fn Timing::with_auto_run_time(self : Timing) -> Timing {
+  {
+    run_time: Auto,
+    rate_func: self.rate_func,
+    reverse_rate_function: self.reverse_rate_function,
+    lag_ratio: self.lag_ratio,
   }
 }
 
@@ -109,6 +168,17 @@ pub fn Timing::with_rate_func(self : Timing, rate_func : RateFunc) -> Timing {
     run_time: self.run_time,
     rate_func,
     reverse_rate_function: self.reverse_rate_function,
+    lag_ratio: self.lag_ratio,
+  }
+}
+
+///|
+pub fn Timing::with_lag_ratio(self : Timing, lag_ratio : Double) -> Timing {
+  {
+    run_time: self.run_time,
+    rate_func: self.rate_func,
+    reverse_rate_function: self.reverse_rate_function,
+    lag_ratio,
   }
 }
 
@@ -128,6 +198,26 @@ pub fn RotationSpec::new(
   about_edge? : @object.Vec3,
 ) -> RotationSpec {
   { angle, axis, about_point, about_edge }
+}
+
+///|
+pub(all) struct ScaleSpec {
+  sx : Double
+  sy : Double
+  sz : Double
+  about_point : @object.Vec3?
+  about_edge : @object.Vec3?
+}
+
+///|
+pub fn ScaleSpec::new(
+  sx~ : Double,
+  sy~ : Double,
+  sz? : Double = 1.0,
+  about_point? : @object.Vec3,
+  about_edge? : @object.Vec3,
+) -> ScaleSpec {
+  { sx, sy, sz, about_point, about_edge }
 }
 
 ///|
@@ -199,17 +289,31 @@ pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
+  Scale(ObjectId, ScaleSpec)
   Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId)
   FadeOut(ObjectId)
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
+  Group(AnimationGroup)
 }
 
 ///|
 pub(all) struct Animation {
   kind : AnimationKind
   timing : Timing
+}
+
+///|
+pub(all) struct AnimationGroup {
+  animations : Array[Animation]
+}
+
+///|
+pub fn[T : IntoAnimation] AnimationGroup::new(
+  animations : Array[T],
+) -> AnimationGroup {
+  { animations: animations.map(animation => into_animation(animation)) }
 }
 
 ///|
@@ -223,6 +327,44 @@ pub fn Animation::new(
 ///|
 pub fn Animation::wait(duration : Double) -> Animation {
   Animation::new(Wait, timing=Timing::new(run_time=duration))
+}
+
+///|
+pub fn[T : IntoAnimation] Animation::group(
+  animations : Array[T],
+  run_time? : Double,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+  lag_ratio? : Double = 0.0,
+) -> Animation {
+  let timing = match run_time {
+    None => Timing::auto(rate_func~, reverse_rate_function~, lag_ratio~)
+    Some(seconds) =>
+      Timing::new(
+        run_time=seconds,
+        rate_func~,
+        reverse_rate_function~,
+        lag_ratio~,
+      )
+  }
+  Animation::new(Group(AnimationGroup::new(animations)), timing~)
+}
+
+///|
+pub fn[T : IntoAnimation] Animation::lagged_start(
+  animations : Array[T],
+  run_time? : Double,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+  lag_ratio? : Double = 0.05,
+) -> Animation {
+  Animation::group(
+    animations,
+    run_time?,
+    rate_func~,
+    reverse_rate_function~,
+    lag_ratio~,
+  )
 }
 
 ///|
@@ -247,6 +389,25 @@ pub fn Animation::draw_border_then_fill(
 ) -> Animation {
   Animation::new(
     DrawBorderThenFill(id),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
+}
+
+///|
+pub fn Animation::scale(
+  id : ObjectId,
+  sx~ : Double,
+  sy~ : Double,
+  sz? : Double = 1.0,
+  about_point? : @object.Vec3,
+  about_edge? : @object.Vec3,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  let spec = ScaleSpec::new(sx~, sy~, sz~, about_point?, about_edge?)
+  Animation::new(
+    Scale(id, spec),
     timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
   )
 }
@@ -338,6 +499,14 @@ pub fn Animation::with_rate_func(
   rate_func : RateFunc,
 ) -> Animation {
   { kind: self.kind, timing: self.timing.with_rate_func(rate_func) }
+}
+
+///|
+pub fn Animation::with_lag_ratio(
+  self : Animation,
+  lag_ratio : Double,
+) -> Animation {
+  { kind: self.kind, timing: self.timing.with_lag_ratio(lag_ratio) }
 }
 
 ///|

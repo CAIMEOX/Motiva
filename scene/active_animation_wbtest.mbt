@@ -138,6 +138,63 @@ test "active rotate can resolve about edge from object bounds" {
 }
 
 ///|
+test "active scale samples around object center" {
+  let scene = Scene::new()
+  let object = @object.into_object(@object.Square::new(side_length=2.0)).with_transform(
+    @object.Transform::translate(@object.Vec3::new(x=3.0, y=2.0)),
+  )
+  let square = scene.object(object)
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::scale(square, sx=2.0, sy=2.0, run_time=2.0),
+  )
+  guard active.kind is ActiveScale(id, ..) else {
+    fail("scale animation should compile to ActiveScale")
+  }
+  assert_true(id == square)
+  guard patch_put_object(active.sample_at_time(1.0), square) is Some(sampled) else {
+    fail("scale sample should put a sampled object")
+  }
+  let center = sampled.center()
+  assert_close(center.x, 3.0)
+  assert_close(center.y, 2.0)
+  guard sampled.bounds() is Some(bounds) else {
+    fail("scale sample should have bounds")
+  }
+  assert_close(bounds.width(), 3.0)
+  assert_close(bounds.height(), 3.0)
+}
+
+///|
+test "object op scale remains a raw affine transform" {
+  let scene = Scene::new()
+  let object = @object.into_object(@object.Square::new(side_length=2.0)).with_transform(
+    @object.Transform::translate(@object.Vec3::new(x=-4.0, y=1.0)),
+  )
+  let square = scene.object(object)
+  let animation = square
+    .animate(run_time=1.0)
+    .scale(sx=0.5, sy=1.5)
+    .to_animation()
+  guard animation.kind is ApplyOps(id, _) else {
+    fail("builder scale should stay a generic object operation animation")
+  }
+  assert_true(id == square)
+  let active = ActiveAnimation::compile(scene, animation)
+  guard patch_put_object(active.sample(1.0), square) is Some(sampled) else {
+    fail("builder scale should put a sampled object")
+  }
+  let center = sampled.center()
+  assert_close(center.x, -2.0)
+  assert_close(center.y, 1.5)
+  guard sampled.bounds() is Some(bounds) else {
+    fail("builder scale sample should have bounds")
+  }
+  assert_close(bounds.width(), 1.0)
+  assert_close(bounds.height(), 3.0)
+}
+
+///|
 test "create samples a path prefix over time" {
   let scene = Scene::new()
   let square = scene.object(@object.Square::new(side_length=4.0))
