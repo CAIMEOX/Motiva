@@ -164,7 +164,7 @@ pub fn Scene::remove(self : Scene, id : ObjectId) -> Unit raise SceneError {
     self.set_subtree_state(id, Removed)
     self.prune_empty_ancestors(scene_object.parent)
     self.foreground = self.foreground.filter(current => {
-      !contains_object_id(removed_family, current)
+      !removed_family.contains(current)
     })
     if !self.family_has_visible_member(root) {
       self.draw_order = self.draw_order.filter(current => current != root)
@@ -193,9 +193,7 @@ pub fn[T : @object.IntoObject] Scene::replace(
 
 ///|
 pub fn Scene::clear(self : Scene) -> Unit {
-  for id in self.draw_order {
-    self.set_subtree_state(id, Removed)
-  }
+  self.draw_order.each(id => self.set_subtree_state(id, Removed))
   self.draw_order = []
   self.foreground = []
 }
@@ -253,9 +251,4 @@ fn Scene::require_object(
     None => raise UnknownObject(id)
     Some(scene_object) => scene_object
   }
-}
-
-///|
-fn contains_object_id(ids : Array[ObjectId], id : ObjectId) -> Bool {
-  ids.fold(init=false, (found, current) => found || current == id)
 }

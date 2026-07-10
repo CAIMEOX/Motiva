@@ -31,8 +31,33 @@ You can browse and install extra skills here:
 - When combining two optional values, prefer matching the tuple `(a, b)` instead
   of nested matches.
 
-- Prefer `Array::fold` for accumulation over `let mut acc` plus a loop when the
-  loop only combines values into one result.
+### Collection operations
+
+- Use `map` when every input produces exactly one output and order/length are
+  preserved. Use an array comprehension (`[for x in xs => ...]`) for the same
+  shape when pattern binding or an inline `if` makes the transformation clearer.
+
+- Use `filter` when values are only retained or discarded. Use `filter_map`
+  when filtering and changing the element type are one operation.
+
+- Use `fold` only for a genuine reduction into one independently computed
+  value, such as a number, bounds, lifecycle summary, or interpreter state. The
+  callback should return the next accumulator value. Do not copy an `Array`
+  accumulator and then `push`/`append` inside `fold`; that hides mutation inside
+  a functional-looking operation and often makes the traversal quadratic.
+
+- `Array` has no `flat_map`. For pure flattening, use
+  `array.iter().flat_map(...).to_array()`. If flattening also needs stable
+  deduplication, correlated output buffers, or other mutable state, use an
+  explicit `for` loop with clearly named builders.
+
+- Use `any`, `all`, and `contains` for boolean membership reductions instead of
+  spelling them as `fold`.
+
+- Use `each` for a simple ordered side effect with no index, accumulator,
+  `break`, or `continue`. Use `for` for interpreters, mutable builders, early
+  control flow, indexed traversal, and algorithms carrying correlated state.
+  Mutation is not forbidden; it should be visible in the construct that owns it.
 
 - Methods that mutate internal reference fields, such as pushing into an
   `Array`, should return `Unit`. Return `Self` only for functions that are

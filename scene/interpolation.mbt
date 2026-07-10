@@ -41,15 +41,11 @@ fn interpolate_children(
   if start.length() != target.length() {
     choose_endpoint(start, target, alpha)
   } else {
-    let children : Array[@object.Object] = []
-    for index in 0..<start.length() {
-      match (start.get(index), target.get(index)) {
-        (Some(start_child), Some(target_child)) =>
-          children.push(interpolate_object(start_child, target_child, alpha))
-        _ => ()
-      }
-    }
-    children
+    start
+    .iter()
+    .zip(target.iter())
+    .map(pair => interpolate_object(pair.0, pair.1, alpha))
+    .to_array()
   }
 }
 

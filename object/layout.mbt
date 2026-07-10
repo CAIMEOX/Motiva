@@ -51,16 +51,15 @@ pub fn Object::arrange(
       let world_children = children.map(child => {
         child.with_transform(child.transform.then(self.transform))
       })
-      let arranged = world_children.fold(init=[], (positioned, child) => {
-        let next = positioned.copy()
-        let child = positioned
+      let arranged : Array[Object] = []
+      for child in world_children {
+        let positioned = arranged
           .last()
           .map_or(child, previous => {
             child.next_to(previous, direction~, buff~, aligned_edge~)
           })
-        next.push(child)
-        next
-      })
+        arranged.push(positioned)
+      }
       let group = Object::new(
         node=Group(arranged),
         id=self.id,

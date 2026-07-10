@@ -102,19 +102,11 @@ fn validate_run_times(
 fn schedule_parallel(
   animations : Array[ActiveAnimation],
 ) -> Array[ScheduledAnimation] {
-  let scheduled : Array[ScheduledAnimation] = []
-  for index in 0..<animations.length() {
-    match animations.get(index) {
-      None => ()
-      Some(animation) =>
-        scheduled.push({
-          animation,
-          start_time: 0.0,
-          end_time: animation.run_time(),
-        })
-    }
-  }
-  scheduled
+  animations.map(animation => {
+    animation,
+    start_time: 0.0,
+    end_time: animation.run_time(),
+  })
 }
 
 ///|
@@ -195,18 +187,17 @@ pub fn PlayPlan::frame_times(self : PlayPlan) -> Array[FrameTime] {
 
 ///|
 pub fn PlayPlan::affected_ids(self : PlayPlan) -> Array[ObjectId] {
-  self.scheduled.fold(init=[], (ids, item) => {
-    let next = ids.copy()
-    next.append(item.animation.affected_ids())
-    next
-  })
+  self.scheduled
+  .iter()
+  .flat_map(item => item.animation.affected_ids().iter())
+  .to_array()
 }
 
 ///|
 pub fn PlayPlan::begin(self : PlayPlan, scene : Scene) -> Unit raise SceneError {
-  for item in self.scheduled {
+  self.scheduled.each(item => {
     scene.apply_frame_patch(item.animation.begin_patch())
-  }
+  })
 }
 
 ///|
@@ -215,13 +206,13 @@ pub fn PlayPlan::apply_frame(
   scene : Scene,
   frame : FrameTime,
 ) -> Unit raise SceneError {
-  for item in self.scheduled {
+  self.scheduled.each(item => {
     if frame.play_time >= item.start_time && frame.play_time <= item.end_time {
       scene.apply_frame_patch(
         item.animation.sample_at_time(frame.play_time - item.start_time),
       )
     }
-  }
+  })
   scene.time = frame.absolute_time
 }
 
@@ -230,8 +221,8 @@ pub fn PlayPlan::finish(
   self : PlayPlan,
   scene : Scene,
 ) -> Unit raise SceneError {
-  for item in self.scheduled {
+  self.scheduled.each(item => {
     scene.apply_frame_patch(item.animation.finish_patch())
-  }
+  })
   scene.time = self.start_time + self.run_time
 }

@@ -364,11 +364,10 @@ fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
     | ActiveReveal(id, ..)
     | ActiveDrawBorderThenFill(id, ..) => [id]
     ActiveGroup(children, ..) =>
-      children.fold(init=[], (ids, child) => {
-        let next = ids.copy()
-        next.append(child.animation.affected_ids())
-        next
-      })
+      children
+      .iter()
+      .flat_map(child => child.animation.affected_ids().iter())
+      .to_array()
   }
 }
 

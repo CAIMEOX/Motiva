@@ -182,13 +182,11 @@ pub fn PathBuffer3D::lerp(
   alpha : Double,
 ) -> PathBuffer3D {
   let (left, right) = self.normalize_pair(other)
-  let points : Array[Vec3] = []
-  for index in 0..<left.points.length() {
-    match (left.points.get(index), right.points.get(index)) {
-      (Some(start), Some(target)) => points.push(lerp(start, target, alpha))
-      _ => ()
-    }
-  }
+  let points = left.points
+    .iter()
+    .zip(right.points.iter())
+    .map(pair => lerp(pair.0, pair.1, alpha))
+    .to_array()
   PathBuffer3D::unsafe_new(points, left.subpaths)
 }
 
@@ -382,13 +380,9 @@ fn PathBuffer3D::subpath_points(
   match span {
     None => []
     Some(span) => {
-      let points : Array[Vec3] = []
       let start = span.start_curve * 4
       let end = start + span.curve_count * 4
-      for index in start..<end {
-        points.push(self.points[index])
-      }
-      points
+      self.points[start:end].to_owned()
     }
   }
 }
@@ -438,13 +432,16 @@ fn split_factor_for_curve(
   current_curve_count : Int,
   target_curve_count : Int,
 ) -> Int {
-  let mut count = 0
-  for target_index in 0..<target_curve_count {
-    if target_index * current_curve_count / target_curve_count == curve_index {
-      count += 1
-    }
+  for target_index in 0..<target_curve_count; count = 0 {
+    continue count +
+      (if target_index * current_curve_count / target_curve_count == curve_index {
+        1
+      } else {
+        0
+      })
+  } nobreak {
+    count
   }
-  count
 }
 
 ///|

@@ -483,9 +483,9 @@ test "wait active animation has no affected ids and empty patches" {
   let scene = Scene::new()
   let active = ActiveAnimation::compile(scene, Animation::wait(1.0))
   assert_eq(active.affected_ids().length(), 0)
-  assert_true(active.begin_patch().is_empty())
-  assert_true(active.sample(0.5).is_empty())
-  assert_true(active.finish_patch().is_empty())
+  assert_eq(active.begin_patch().ops.length(), 0)
+  assert_eq(active.sample(0.5).ops.length(), 0)
+  assert_eq(active.finish_patch().ops.length(), 0)
 }
 
 ///|

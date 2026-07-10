@@ -17,7 +17,7 @@ fn FramePatch::empty() -> FramePatch {
 
 ///|
 fn FramePatch::from_ops(ops : Array[FrameOp]) -> FramePatch {
-  { ops: ops.copy() }
+  { ops, }
 }
 
 ///|
@@ -37,19 +37,12 @@ fn FramePatch::hide(id : ObjectId) -> FramePatch {
 
 ///|
 fn FramePatch::then(self : FramePatch, next : FramePatch) -> FramePatch {
-  let ops = self.ops.copy()
-  ops.append(next.ops)
-  { ops, }
+  { ops: self.ops.iter().concat(next.ops.iter()).to_array() }
 }
 
 ///|
 fn FramePatch::all(patches : Array[FramePatch]) -> FramePatch {
-  patches.fold(init=FramePatch::empty(), (patch, next) => patch.then(next))
-}
-
-///|
-fn FramePatch::is_empty(self : FramePatch) -> Bool {
-  self.ops.length() == 0
+  { ops: patches.iter().flat_map(patch => patch.ops.iter()).to_array() }
 }
 
 ///|
@@ -57,15 +50,13 @@ fn Scene::apply_frame_patch(
   self : Scene,
   patch : FramePatch,
 ) -> Unit raise SceneError {
-  if !patch.is_empty() {
-    for op in patch.ops {
-      match op {
-        Put(id, object) => self.replace_object(id, object)
-        EnsureVisible(id) => self.ensure_visible(id)
-        Hide(id) => self.remove(id)
-      }
+  patch.ops.each(op => {
+    match op {
+      Put(id, object) => self.replace_object(id, object)
+      EnsureVisible(id) => self.ensure_visible(id)
+      Hide(id) => self.remove(id)
     }
-  }
+  })
 }
 
 ///|

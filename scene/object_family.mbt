@@ -25,11 +25,13 @@ fn Scene::collect_family(self : Scene, id : ObjectId) -> Array[ObjectId] {
   match self.objects.get(id) {
     None => []
     Some(scene_object) =>
-      scene_object.children.fold(init=[id], (family, child) => {
-        let next = family.copy()
-        next.append(self.collect_family(child))
-        next
-      })
+      Iter::singleton(id)
+      .concat(
+        scene_object.children
+        .iter()
+        .flat_map(child => self.collect_family(child).iter()),
+      )
+      .to_array()
   }
 }
 
@@ -212,11 +214,7 @@ fn Scene::prune_empty_ancestors(self : Scene, id : ObjectId?) -> Unit {
       match self.objects.get(id) {
         None => ()
         Some(scene_object) => {
-          let has_visible_child = scene_object.children.fold(init=false, (
-            visible,
-            child,
-          ) => {
-            visible ||
+          let has_visible_child = scene_object.children.any(child => {
             self.objects
             .get(child)
             .map_or(false, child_object => child_object.state == Visible)
@@ -256,13 +254,11 @@ fn Scene::is_ancestor(
 
 ///|
 fn Scene::family_has_visible_member(self : Scene, id : ObjectId) -> Bool {
-  self
-  .collect_family(id)
-  .fold(init=false, (visible, object_id) => {
-    visible ||
-    self.objects
-    .get(object_id)
-    .map_or(false, scene_object => scene_object.state == Visible)
+  self.objects
+  .get(id)
+  .map_or(false, scene_object => {
+    scene_object.state == Visible ||
+    scene_object.children.any(child => self.family_has_visible_member(child))
   })
 }
 
@@ -276,9 +272,7 @@ fn Scene::set_subtree_state(
     None => ()
     Some(scene_object) => {
       self.objects[id] = { ..scene_object, state, }
-      for child in scene_object.children {
-        self.set_subtree_state(child, state)
-      }
+      scene_object.children.each(child => self.set_subtree_state(child, state))
     }
   }
 }

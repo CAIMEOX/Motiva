@@ -95,7 +95,7 @@ pub fn FrameSnapshot::from_scene(
   let foreground_ids = collect_family_ids(scene, foreground_roots)
   let main_items : Array[RenderItem] = []
   let foreground_items : Array[RenderItem] = []
-  let main_ids : Array[@scene.ObjectId] = []
+  let main_ids : Set[@scene.ObjectId] = Set([])
   for root in scene.visible_objects() {
     push_family_items(
       main_items,
@@ -106,7 +106,8 @@ pub fn FrameSnapshot::from_scene(
       excluded=foreground_ids,
     )
   }
-  let rendered_foreground_ids : Array[@scene.ObjectId] = []
+  let rendered_foreground_ids : Set[@scene.ObjectId] = Set([])
+  let no_exclusions : Set[@scene.ObjectId] = Set([])
   for root in foreground_roots {
     push_family_items(
       foreground_items,
@@ -114,7 +115,7 @@ pub fn FrameSnapshot::from_scene(
       scene,
       root,
       Foreground,
-      excluded=[],
+      excluded=no_exclusions,
     )
   }
   main_items.append(foreground_items)
@@ -122,44 +123,37 @@ pub fn FrameSnapshot::from_scene(
 }
 
 ///|
-fn contains_id(ids : Array[@scene.ObjectId], id : @scene.ObjectId) -> Bool {
-  ids.fold(init=false, (found, current) => found || current == id)
-}
-
-///|
 fn collect_family_ids(
   scene : @scene.Scene,
   roots : Array[@scene.ObjectId],
-) -> Array[@scene.ObjectId] raise RenderError {
-  roots.fold(init=[], (ids, root) => {
-    let next = ids.copy()
+) -> Set[@scene.ObjectId] raise RenderError {
+  let ids : Set[@scene.ObjectId] = Set([])
+  for root in roots {
     for id in try_scene(() => scene.family(root)) {
-      if !contains_id(next, id) {
-        next.push(id)
-      }
+      ids.add(id)
     }
-    next
-  })
+  }
+  ids
 }
 
 ///|
 fn push_family_items(
   items : Array[RenderItem],
-  rendered_ids : Array[@scene.ObjectId],
+  rendered_ids : Set[@scene.ObjectId],
   scene : @scene.Scene,
   root : @scene.ObjectId,
   layer : RenderLayer,
-  excluded~ : Array[@scene.ObjectId],
+  excluded~ : Set[@scene.ObjectId],
 ) -> Unit raise RenderError {
   for id in try_scene(() => scene.family(root)) {
     if scene.is_visible(id) &&
-      !contains_id(excluded, id) &&
-      !contains_id(rendered_ids, id) {
+      !excluded.contains(id) &&
+      !rendered_ids.contains(id) {
       match scene.get(id) {
         None => raise MissingObject(id)
         Some({ node: Path(_, _), .. } as object) => {
           push_z_sorted(items, { id, object, layer })
-          rendered_ids.push(id)
+          rendered_ids.add(id)
         }
         Some(_) => ()
       }
@@ -169,15 +163,10 @@ fn push_family_items(
 
 ///|
 fn push_z_sorted(items : Array[RenderItem], item : RenderItem) -> Unit {
-  let mut inserted = false
-  for index in 0..<items.length() {
-    if !inserted && item.object.z_index < items[index].object.z_index {
-      items.insert(index, item)
-      inserted = true
-    }
-  }
-  if !inserted {
-    items.push(item)
+  match
+    items.search_by(current => item.object.z_index < current.object.z_index) {
+    Some(index) => items.insert(index, item)
+    None => items.push(item)
   }
 }
 
