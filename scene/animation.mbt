@@ -240,6 +240,11 @@ pub fn FadeSpec::new(
 pub(all) enum ObjectOp {
   ApplyTransform(@object.Transform)
   ScaleOp(ScaleSpec)
+  MoveTo(@object.Vec3)
+  SetFill(@object.Rgba?, Double?)
+  SetStroke(@object.Rgba?, Double?, Double?)
+  SetColor(@object.Rgba)
+  SetOpacity(Double)
   SetTransform(@object.Transform)
   SetZIndex(Double)
 }
@@ -258,6 +263,11 @@ pub fn ObjectOp::scale(
   about_edge? : @object.Vec3,
 ) -> ObjectOp {
   ScaleOp(ScaleSpec::new(sx~, sy~, sz~, about_point?, about_edge?))
+}
+
+///|
+pub fn ObjectOp::move_to(point : @object.Vec3) -> ObjectOp {
+  MoveTo(point)
 }
 
 ///|
@@ -291,6 +301,30 @@ pub fn ObjectOp::set_z_index(z_index : Double) -> ObjectOp {
 }
 
 ///|
+pub fn ObjectOp::set_fill(color? : @object.Rgba, opacity? : Double) -> ObjectOp {
+  SetFill(color, opacity)
+}
+
+///|
+pub fn ObjectOp::set_stroke(
+  color? : @object.Rgba,
+  width? : Double,
+  opacity? : Double,
+) -> ObjectOp {
+  SetStroke(color, width, opacity)
+}
+
+///|
+pub fn ObjectOp::set_color(color : @object.Rgba) -> ObjectOp {
+  SetColor(color)
+}
+
+///|
+pub fn ObjectOp::set_opacity(opacity : Double) -> ObjectOp {
+  SetOpacity(opacity)
+}
+
+///|
 pub fn ObjectOp::apply(
   self : ObjectOp,
   object : @object.Object,
@@ -299,9 +333,27 @@ pub fn ObjectOp::apply(
     ApplyTransform(transform) =>
       object.with_transform(object.transform.then(transform))
     ScaleOp(spec) => sample_scale_object(object, spec, 1.0)
+    MoveTo(point) => move_object_to(object, point)
+    SetFill(color, opacity) => object.set_fill(color?, opacity?)
+    SetStroke(color, width, opacity) =>
+      object.set_stroke(color?, width?, opacity?)
+    SetColor(color) => object.set_color(color)
+    SetOpacity(opacity) => object.set_fill(opacity~).set_stroke(opacity~)
     SetTransform(transform) => object.with_transform(transform)
     SetZIndex(z_index) => object.with_z_index(z_index)
   }
+}
+
+///|
+fn move_object_to(
+  object : @object.Object,
+  point : @object.Vec3,
+) -> @object.Object {
+  object.with_transform(
+    object.transform.then(
+      @object.Transform::translate(point.sub(object.center())),
+    ),
+  )
 }
 
 ///|
@@ -618,6 +670,14 @@ pub fn AnimationBuilder::scale(
 }
 
 ///|
+pub fn AnimationBuilder::move_to(
+  self : AnimationBuilder,
+  point : @object.Vec3,
+) -> AnimationBuilder {
+  self.with_op(ObjectOp::move_to(point))
+}
+
+///|
 pub fn AnimationBuilder::rotate(
   self : AnimationBuilder,
   angle~ : Double,
@@ -663,6 +723,41 @@ pub fn AnimationBuilder::set_z_index(
   z_index : Double,
 ) -> AnimationBuilder {
   self.with_op(ObjectOp::set_z_index(z_index))
+}
+
+///|
+pub fn AnimationBuilder::set_fill(
+  self : AnimationBuilder,
+  color? : @object.Rgba,
+  opacity? : Double,
+) -> AnimationBuilder {
+  self.with_op(ObjectOp::set_fill(color?, opacity?))
+}
+
+///|
+pub fn AnimationBuilder::set_stroke(
+  self : AnimationBuilder,
+  color? : @object.Rgba,
+  width? : Double,
+  opacity? : Double,
+) -> AnimationBuilder {
+  self.with_op(ObjectOp::set_stroke(color?, width?, opacity?))
+}
+
+///|
+pub fn AnimationBuilder::set_color(
+  self : AnimationBuilder,
+  color : @object.Rgba,
+) -> AnimationBuilder {
+  self.with_op(ObjectOp::set_color(color))
+}
+
+///|
+pub fn AnimationBuilder::set_opacity(
+  self : AnimationBuilder,
+  opacity : Double,
+) -> AnimationBuilder {
+  self.with_op(ObjectOp::set_opacity(opacity))
 }
 
 ///|

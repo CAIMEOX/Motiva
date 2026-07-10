@@ -62,6 +62,7 @@ pub fn[T : IntoAnimation] Scene::compile_play_plan(
   let active_animations = animations.map(animation => {
     ActiveAnimation::compile(self, into_animation(animation))
   })
+  validate_family_animation_targets(self, active_animations)
   validate_run_times(active_animations)
   let scheduled = schedule_parallel(active_animations)
   let run_time = scheduled.fold(init=0.0, (duration, item) => {

@@ -49,7 +49,11 @@ pub fn Object::with_transform(self : Object, transform : Transform) -> Object {
 
 ///|
 pub fn Object::with_z_index(self : Object, z_index : Double) -> Object {
-  { id: self.id, transform: self.transform, z_index, node: self.node }
+  let node = match self.node {
+    Group(children) => Group(children.map(child => child.with_z_index(z_index)))
+    _ => self.node
+  }
+  { id: self.id, transform: self.transform, z_index, node }
 }
 
 ///|

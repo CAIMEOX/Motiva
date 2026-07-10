@@ -303,6 +303,96 @@ test "object op scale keeps object center by default" {
 }
 
 ///|
+test "object op style mutations interpolate through animation builder" {
+  let scene = Scene::new()
+  let start_style = @object.ShapeStyle::new(
+    fill=@object.Rgba::rgb(r=1.0, g=0.0, b=0.0),
+    fill_opacity=0.2,
+    stroke=@object.Rgba::rgb(r=0.0, g=0.0, b=1.0),
+    stroke_opacity=0.4,
+    stroke_width=2.0,
+  )
+  let square = scene.object(
+    @object.Square::new(side_length=2.0, style=start_style),
+  )
+  let active = ActiveAnimation::compile(
+    scene,
+    square
+    .animate(run_time=2.0)
+    .set_fill(color=@object.Rgba::rgb(r=0.0, g=1.0, b=0.0), opacity=0.8)
+    .set_stroke(
+      color=@object.Rgba::rgb(r=1.0, g=1.0, b=1.0),
+      width=6.0,
+      opacity=1.0,
+    )
+    .to_animation(),
+  )
+  guard patch_put_object(active.sample(0.5), square) is Some(sampled) else {
+    fail("style builder sample should put an interpolated object")
+  }
+  let style = path_style(sampled)
+  guard style.fill is Some(fill) else { fail("sampled style should keep fill") }
+  assert_close(fill.r, 0.5)
+  assert_close(fill.g, 0.5)
+  assert_close(fill.b, 0.0)
+  assert_close(style.fill_opacity, 0.5)
+  guard style.stroke is Some(stroke) else {
+    fail("sampled style should keep stroke")
+  }
+  assert_close(stroke.r, 0.5)
+  assert_close(stroke.g, 0.5)
+  assert_close(stroke.b, 1.0)
+  assert_close(style.stroke_opacity, 0.7)
+  assert_close(style.stroke_width, 4.0)
+}
+
+///|
+test "object op move to set color and set opacity compose as builder mutations" {
+  let scene = Scene::new()
+  let start_style = @object.ShapeStyle::new(
+    fill=@object.Rgba::red(),
+    fill_opacity=0.6,
+    stroke=@object.Rgba::white(),
+    stroke_opacity=0.8,
+    stroke_width=3.0,
+  )
+  let object = @object.into_object(
+    @object.Circle::new(radius=1.0, style=start_style),
+  ).with_transform(
+    @object.Transform::translate(@object.Vec3::new(x=-2.0, y=1.0)),
+  )
+  let circle = scene.object(object)
+  let active = ActiveAnimation::compile(
+    scene,
+    circle
+    .animate(run_time=1.0)
+    .move_to(@object.Vec3::new(x=3.0, y=-1.0))
+    .set_color(@object.Rgba::rgb(r=0.0, g=0.5, b=1.0))
+    .set_opacity(0.25)
+    .to_animation(),
+  )
+  guard patch_put_object(active.sample(1.0), circle) is Some(sampled) else {
+    fail("builder mutation sample should put final object")
+  }
+  let center = sampled.center()
+  assert_close(center.x, 3.0)
+  assert_close(center.y, -1.0)
+  let style = path_style(sampled)
+  guard style.fill is Some(fill) else { fail("final style should keep fill") }
+  assert_close(fill.r, 0.0)
+  assert_close(fill.g, 0.5)
+  assert_close(fill.b, 1.0)
+  guard style.stroke is Some(stroke) else {
+    fail("final style should keep stroke")
+  }
+  assert_close(stroke.r, 0.0)
+  assert_close(stroke.g, 0.5)
+  assert_close(stroke.b, 1.0)
+  assert_close(style.fill_opacity, 0.25)
+  assert_close(style.stroke_opacity, 0.25)
+}
+
+///|
 test "create samples a path prefix over time" {
   let scene = Scene::new()
   let square = scene.object(@object.Square::new(side_length=4.0))

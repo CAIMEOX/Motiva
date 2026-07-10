@@ -87,12 +87,16 @@ pub(all) struct Object {
   z_index : Double
   node : Node
 }
+pub fn Object::align_to(Self, Self, direction~ : Vec3) -> Self
+pub fn Object::arrange(Self, direction? : Vec3, buff? : Double, center? : Bool, aligned_edge? : Vec3) -> Self
 pub fn Object::bounds(Self) -> Aabb?
 pub fn Object::center(Self) -> Vec3
 pub fn Object::critical_point(Self, Vec3) -> Vec3
 pub fn Object::empty(id? : String) -> Self
 pub fn Object::group(Array[Self], id? : String) -> Self
+pub fn Object::move_to(Self, Vec3, aligned_edge? : Vec3) -> Self
 pub fn Object::new(node~ : Node, id? : String, transform? : Transform, z_index? : Double) -> Self
+pub fn Object::next_to(Self, Self, direction? : Vec3, buff? : Double, aligned_edge? : Vec3) -> Self
 pub fn Object::path(Path3D, style? : ShapeStyle, id? : String) -> Self
 pub fn Object::set_color(Self, Rgba) -> Self
 pub fn Object::set_fill(Self, color? : Rgba, opacity? : Double) -> Self

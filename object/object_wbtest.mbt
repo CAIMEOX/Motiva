@@ -229,6 +229,21 @@ test "dot is a filled circle centered at its point" {
 }
 
 ///|
+test "with_z_index applies to the complete object family" {
+  let family = Object::group([
+    into_object(Square::new()),
+    Object::group([into_object(Circle::new())]),
+  ]).with_z_index(3.0)
+  assert_true(Double::abs(family.z_index - 3.0) < 0.000001)
+  guard family.node is Group([square, nested]) && nested.node is Group([circle]) else {
+    fail("z-index should preserve family topology")
+  }
+  assert_true(Double::abs(square.z_index - 3.0) < 0.000001)
+  assert_true(Double::abs(nested.z_index - 3.0) < 0.000001)
+  assert_true(Double::abs(circle.z_index - 3.0) < 0.000001)
+}
+
+///|
 test "3d transform applies translation scale and z rotation" {
   let transform = Transform::scale(sx=2.0, sy=3.0, sz=4.0)
     .then(Transform::translate(Vec3::new(x=1.0, y=2.0, z=3.0)))

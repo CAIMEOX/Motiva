@@ -33,6 +33,73 @@ test "snapshot separates foreground from main draw items" {
 }
 
 ///|
+test "snapshot expands only visible leaves of an object family" {
+  let scene = @scene.Scene::new()
+  let root = scene.object(
+    @object.Object::group([
+      @object.into_object(@object.Square::new()),
+      @object.into_object(@object.Circle::new()),
+    ]),
+  )
+  guard scene.children(root) is [square, circle] else {
+    fail("family should expose both child ids")
+  }
+  scene.show(square)
+  let snapshot = FrameSnapshot::from_scene(scene)
+  guard snapshot.items is [item] else {
+    fail("snapshot should contain only the visible family leaf")
+  }
+  assert_true(item.id == square)
+  assert_true(item.layer == Main)
+  assert_true(!scene.is_visible(circle))
+}
+
+///|
+test "foreground family child is rendered once above its siblings" {
+  let scene = @scene.Scene::new()
+  let root = scene.add(
+    @object.Object::group([
+      @object.into_object(@object.Square::new()),
+      @object.into_object(@object.Circle::new()),
+    ]),
+  )
+  guard scene.children(root) is [square, circle] else {
+    fail("family should expose both child ids")
+  }
+  scene.show_foreground(square)
+  let snapshot = FrameSnapshot::from_scene(scene)
+  guard snapshot.items is [main, foreground] else {
+    fail("foreground child should not remain nested in a main render item")
+  }
+  assert_true(main.id == circle)
+  assert_true(main.layer == Main)
+  assert_true(foreground.id == square)
+  assert_true(foreground.layer == Foreground)
+}
+
+///|
+test "snapshot sorts family leaves and top-level objects by z index" {
+  let scene = @scene.Scene::new()
+  let root = scene.add(
+    @object.Object::group([
+      @object.into_object(@object.Square::new()).with_z_index(2.0),
+      @object.into_object(@object.Circle::new()).with_z_index(-2.0),
+    ]),
+  )
+  guard scene.children(root) is [square, circle] else {
+    fail("family should expose both child ids")
+  }
+  let dot = scene.add(@object.into_object(@object.Dot::new()).with_z_index(0.0))
+  let snapshot = FrameSnapshot::from_scene(scene)
+  guard snapshot.items is [back, middle, front] else {
+    fail("snapshot should flatten all visible leaves")
+  }
+  assert_true(back.id == circle)
+  assert_true(middle.id == dot)
+  assert_true(front.id == square)
+}
+
+///|
 test "camera derives missing frame dimension from pixel aspect" {
   let wide = Camera::new(pixel_width=1280, pixel_height=720, frame_width=6.0)
   assert_render_close(wide.frame_width, 6.0)

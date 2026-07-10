@@ -91,16 +91,31 @@ pub fn FrameSnapshot::from_scene(
   camera? : Camera = Camera::default(),
   frame_index? : Int = 0,
 ) -> FrameSnapshot raise RenderError {
-  let foreground_ids = scene.foreground_objects()
+  let foreground_roots = scene.foreground_objects()
+  let foreground_ids = collect_family_ids(scene, foreground_roots)
   let main_items : Array[RenderItem] = []
   let foreground_items : Array[RenderItem] = []
-  for id in scene.visible_objects() {
-    if !contains_id(foreground_ids, id) {
-      push_scene_item(main_items, scene, id, Main)
-    }
+  let main_ids : Array[@scene.ObjectId] = []
+  for root in scene.visible_objects() {
+    push_family_items(
+      main_items,
+      main_ids,
+      scene,
+      root,
+      Main,
+      excluded=foreground_ids,
+    )
   }
-  for id in foreground_ids {
-    push_scene_item(foreground_items, scene, id, Foreground)
+  let rendered_foreground_ids : Array[@scene.ObjectId] = []
+  for root in foreground_roots {
+    push_family_items(
+      foreground_items,
+      rendered_foreground_ids,
+      scene,
+      root,
+      Foreground,
+      excluded=[],
+    )
   }
   main_items.append(foreground_items)
   { time: scene.time(), frame_index, camera, items: main_items }
@@ -112,15 +127,43 @@ fn contains_id(ids : Array[@scene.ObjectId], id : @scene.ObjectId) -> Bool {
 }
 
 ///|
-fn push_scene_item(
-  items : Array[RenderItem],
+fn collect_family_ids(
   scene : @scene.Scene,
-  id : @scene.ObjectId,
+  roots : Array[@scene.ObjectId],
+) -> Array[@scene.ObjectId] raise RenderError {
+  roots.fold(init=[], (ids, root) => {
+    let next = ids.copy()
+    for id in try_scene(() => scene.family(root)) {
+      if !contains_id(next, id) {
+        next.push(id)
+      }
+    }
+    next
+  })
+}
+
+///|
+fn push_family_items(
+  items : Array[RenderItem],
+  rendered_ids : Array[@scene.ObjectId],
+  scene : @scene.Scene,
+  root : @scene.ObjectId,
   layer : RenderLayer,
+  excluded~ : Array[@scene.ObjectId],
 ) -> Unit raise RenderError {
-  match scene.get(id) {
-    None => raise MissingObject(id)
-    Some(object) => push_z_sorted(items, { id, object, layer })
+  for id in try_scene(() => scene.family(root)) {
+    if scene.is_visible(id) &&
+      !contains_id(excluded, id) &&
+      !contains_id(rendered_ids, id) {
+      match scene.get(id) {
+        None => raise MissingObject(id)
+        Some({ node: Path(_, _), .. } as object) => {
+          push_z_sorted(items, { id, object, layer })
+          rendered_ids.push(id)
+        }
+        Some(_) => ()
+      }
+    }
   }
 }
 

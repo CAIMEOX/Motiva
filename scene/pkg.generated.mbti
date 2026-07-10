@@ -11,6 +11,9 @@ pub fn[T : IntoAnimation] into_animation(T) -> Animation
 // Errors
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  NonInvertibleFamilyTransform(ObjectId)
+  FamilyTopologyMismatch(ObjectId)
+  ConflictingFamilyAnimations(ObjectId, ObjectId)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)
@@ -44,11 +47,16 @@ pub(all) struct AnimationBuilder {
   ops : Array[ObjectOp]
   timing : Timing
 }
+pub fn AnimationBuilder::move_to(Self, @object.Vec3) -> Self
 pub fn AnimationBuilder::rotate(Self, angle~ : Double) -> Self
 pub fn AnimationBuilder::rotate_x(Self, angle~ : Double) -> Self
 pub fn AnimationBuilder::rotate_y(Self, angle~ : Double) -> Self
 pub fn AnimationBuilder::rotate_z(Self, angle~ : Double) -> Self
 pub fn AnimationBuilder::scale(Self, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3) -> Self
+pub fn AnimationBuilder::set_color(Self, @object.Rgba) -> Self
+pub fn AnimationBuilder::set_fill(Self, color? : @object.Rgba, opacity? : Double) -> Self
+pub fn AnimationBuilder::set_opacity(Self, Double) -> Self
+pub fn AnimationBuilder::set_stroke(Self, color? : @object.Rgba, width? : Double, opacity? : Double) -> Self
 pub fn AnimationBuilder::set_transform(Self, @object.Transform) -> Self
 pub fn AnimationBuilder::set_z_index(Self, Double) -> Self
 pub fn AnimationBuilder::shift(Self, @object.Vec3) -> Self
@@ -99,15 +107,25 @@ pub fn ObjectId::value(Self) -> Int
 pub(all) enum ObjectOp {
   ApplyTransform(@object.Transform)
   ScaleOp(ScaleSpec)
+  MoveTo(@object.Vec3)
+  SetFill(@object.Rgba?, Double?)
+  SetStroke(@object.Rgba?, Double?, Double?)
+  SetColor(@object.Rgba)
+  SetOpacity(Double)
   SetTransform(@object.Transform)
   SetZIndex(Double)
 }
 pub fn ObjectOp::apply(Self, @object.Object) -> @object.Object
+pub fn ObjectOp::move_to(@object.Vec3) -> Self
 pub fn ObjectOp::rotate(angle~ : Double) -> Self
 pub fn ObjectOp::rotate_x(angle~ : Double) -> Self
 pub fn ObjectOp::rotate_y(angle~ : Double) -> Self
 pub fn ObjectOp::rotate_z(angle~ : Double) -> Self
 pub fn ObjectOp::scale(sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3) -> Self
+pub fn ObjectOp::set_color(@object.Rgba) -> Self
+pub fn ObjectOp::set_fill(color? : @object.Rgba, opacity? : Double) -> Self
+pub fn ObjectOp::set_opacity(Double) -> Self
+pub fn ObjectOp::set_stroke(color? : @object.Rgba, width? : Double, opacity? : Double) -> Self
 pub fn ObjectOp::set_transform(@object.Transform) -> Self
 pub fn ObjectOp::set_z_index(Double) -> Self
 pub fn ObjectOp::shift(@object.Vec3) -> Self
@@ -191,14 +209,17 @@ pub(all) struct Scene {
 }
 pub fn[T : @object.IntoObject] Scene::add(Self, T, id? : String) -> ObjectId
 pub fn[T : @object.IntoObject] Scene::add_foreground(Self, T, id? : String) -> ObjectId
+pub fn Scene::children(Self, ObjectId) -> Array[ObjectId] raise SceneError
 pub fn Scene::clear(Self) -> Unit
 pub fn[T : IntoAnimation] Scene::compile_play_plan(Self, Array[T], config? : PlayConfig) -> PlayPlan raise SceneError
+pub fn Scene::family(Self, ObjectId) -> Array[ObjectId] raise SceneError
 pub fn Scene::foreground_objects(Self) -> Array[ObjectId]
 pub fn Scene::get(Self, ObjectId) -> @object.Object?
 pub fn Scene::is_visible(Self, ObjectId) -> Bool
 pub fn Scene::new(config? : SceneConfig) -> Self
 pub fn[T : @object.IntoObject] Scene::object(Self, T, id? : String) -> ObjectId
 pub fn Scene::object_count(Self) -> Int
+pub fn Scene::parent(Self, ObjectId) -> ObjectId? raise SceneError
 pub fn[T : IntoAnimation] Scene::play(Self, Array[T]) -> Unit raise SceneError
 pub fn Scene::play_immediate(Self, Array[Animation], config? : PlayConfig) -> Unit raise SceneError
 pub fn Scene::remove(Self, ObjectId) -> Unit raise SceneError

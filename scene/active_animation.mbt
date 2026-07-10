@@ -59,53 +59,52 @@ fn ActiveAnimation::compile(
     Create(id) =>
       ActiveAnimation::reveal(
         id,
-        source=scene.require_object(id).object,
+        source=scene.require_materialized_object(id),
         timing=animation.timing,
       )
     DrawBorderThenFill(id) =>
       ActiveAnimation::draw_border_then_fill(
         id,
-        source=scene.require_object(id).object,
+        source=scene.require_materialized_object(id),
         timing=animation.timing,
       )
     Scale(id, spec) =>
       ActiveAnimation::scale(
         id,
-        start=scene.require_object(id).object,
+        start=scene.require_materialized_object(id),
         spec~,
         timing=animation.timing,
       )
     Rotate(id, spec) =>
       ActiveAnimation::rotate(
         id,
-        start=scene.require_object(id).object,
+        start=scene.require_materialized_object(id),
         spec~,
         timing=animation.timing,
       )
     FadeIn(id, spec) =>
       ActiveAnimation::fade_in(
         id,
-        source=scene.require_object(id).object,
+        source=scene.require_materialized_object(id),
         spec~,
         timing=animation.timing,
       )
     FadeOut(id, spec) =>
       ActiveAnimation::fade_out(
         id,
-        source=scene.require_object(id).object,
+        source=scene.require_materialized_object(id),
         spec~,
         timing=animation.timing,
       )
-    Transform(id, target) =>
-      ActiveAnimation::transform(
-        id,
-        start=scene.require_object(id).object,
-        target~,
-        timing=animation.timing,
-      )
+    Transform(id, target) => {
+      let start = scene.require_materialized_object(id)
+      scene.validate_replacement_topology(id, target)
+      ActiveAnimation::transform(id, start~, target~, timing=animation.timing)
+    }
     ApplyOps(id, ops) => {
-      let start = scene.require_object(id).object
+      let start = scene.require_materialized_object(id)
       let target = ops.fold(init=start, (object, op) => op.apply(object))
+      scene.validate_replacement_topology(id, target)
       ActiveAnimation::transform(id, start~, target~, timing=animation.timing)
     }
     Group(group) =>
@@ -286,6 +285,7 @@ fn ActiveAnimation::group(
   let children = animations.map(animation => {
     ActiveAnimation::compile(scene, animation)
   })
+  validate_family_animation_targets(scene, children)
   let scheduled = schedule_group_children(children, timing.lag_ratio)
   let natural_run_time = scheduled.fold(init=0.0, (duration, child) => {
     if child.end_time > duration {
@@ -299,6 +299,28 @@ fn ActiveAnimation::group(
     timing,
     run_time: timing.resolve_run_time(natural_run_time),
     lifecycle: group_lifecycle(scheduled),
+  }
+}
+
+///|
+fn validate_family_animation_targets(
+  scene : Scene,
+  animations : Array[ActiveAnimation],
+) -> Unit raise SceneError {
+  for first_index in 0..<animations.length() {
+    guard animations.get(first_index) is Some(first_animation) else { continue }
+    for second_index in (first_index + 1)..<animations.length() {
+      guard animations.get(second_index) is Some(second_animation) else {
+        continue
+      }
+      for first in first_animation.affected_ids() {
+        for second in second_animation.affected_ids() {
+          if scene.same_family_branch(first, second) {
+            raise ConflictingFamilyAnimations(first, second)
+          }
+        }
+      }
+    }
   }
 }
 

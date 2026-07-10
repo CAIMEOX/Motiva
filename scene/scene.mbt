@@ -45,6 +45,9 @@ pub(all) struct SceneObject {
 ///|
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  NonInvertibleFamilyTransform(ObjectId)
+  FamilyTopologyMismatch(ObjectId)
+  ConflictingFamilyAnimations(ObjectId, ObjectId)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)
@@ -134,10 +137,12 @@ pub fn[T : @object.IntoObject] Scene::add_foreground(
 
 ///|
 pub fn Scene::show(self : Scene, id : ObjectId) -> Unit raise SceneError {
-  let scene_object = self.require_object(id)
-  self.remove_from_visible_lists(id)
-  self.objects[id] = { ..scene_object, state: Visible }
-  self.draw_order.push(id)
+  ignore(self.require_object(id))
+  self.set_subtree_state(id, Visible)
+  self.set_ancestors_visible(id)
+  let root = self.family_root(id)
+  self.draw_order = self.draw_order.filter(current => current != root)
+  self.draw_order.push(root)
 }
 
 ///|
@@ -153,13 +158,18 @@ pub fn Scene::show_foreground(
 ///|
 pub fn Scene::remove(self : Scene, id : ObjectId) -> Unit raise SceneError {
   let scene_object = self.require_object(id)
-  self.remove_from_visible_lists(id)
-  let next_state = if scene_object.state == Visible {
-    Removed
-  } else {
-    scene_object.state
+  if self.family_has_visible_member(id) {
+    let root = self.family_root(id)
+    let removed_family = self.collect_family(id)
+    self.set_subtree_state(id, Removed)
+    self.prune_empty_ancestors(scene_object.parent)
+    self.foreground = self.foreground.filter(current => {
+      !contains_object_id(removed_family, current)
+    })
+    if !self.family_has_visible_member(root) {
+      self.draw_order = self.draw_order.filter(current => current != root)
+    }
   }
-  self.objects[id] = { ..scene_object, state: next_state }
 }
 
 ///|
@@ -184,11 +194,7 @@ pub fn[T : @object.IntoObject] Scene::replace(
 ///|
 pub fn Scene::clear(self : Scene) -> Unit {
   for id in self.draw_order {
-    match self.objects.get(id) {
-      None => ()
-      Some(scene_object) =>
-        self.objects[id] = { ..scene_object, state: Removed }
-    }
+    self.set_subtree_state(id, Removed)
   }
   self.draw_order = []
   self.foreground = []
@@ -196,7 +202,7 @@ pub fn Scene::clear(self : Scene) -> Unit {
 
 ///|
 pub fn Scene::get(self : Scene, id : ObjectId) -> @object.Object? {
-  self.objects.get(id).map(scene_object => scene_object.object)
+  self.materialize_object(id)
 }
 
 ///|
@@ -235,10 +241,7 @@ fn Scene::insert_object(
   object : @object.Object,
   state : ObjectState,
 ) -> ObjectId {
-  let id = { value: self.next_id }
-  self.next_id += 1
-  self.objects[id] = { object, state, parent: None, children: [] }
-  id
+  self.insert_object_with_parent(object, state, None)
 }
 
 ///|
@@ -253,17 +256,6 @@ fn Scene::require_object(
 }
 
 ///|
-fn Scene::replace_object(
-  self : Scene,
-  id : ObjectId,
-  object : @object.Object,
-) -> Unit raise SceneError {
-  let scene_object = self.require_object(id)
-  self.objects[id] = { ..scene_object, object, }
-}
-
-///|
-fn Scene::remove_from_visible_lists(self : Scene, id : ObjectId) -> Unit {
-  self.draw_order = self.draw_order.filter(current => current != id)
-  self.foreground = self.foreground.filter(current => current != id)
+fn contains_object_id(ids : Array[ObjectId], id : ObjectId) -> Bool {
+  ids.fold(init=false, (found, current) => found || current == id)
 }
