@@ -43,6 +43,42 @@ pub fn Arc::new(radius? : Double, start_angle? : Double, angle? : Double, segmen
 pub fn Arc::path(Self) -> Path3D
 pub impl IntoObject for Arc
 
+pub(all) struct Arrow {
+  start : Vec3
+  end : Vec3
+  buff : Double
+  tip_length : Double
+  tip_width : Double
+  max_tip_length_to_length_ratio : Double
+  style : ShapeStyle
+}
+pub fn Arrow::new(start? : Vec3, end? : Vec3, buff? : Double, tip_length? : Double, tip_width? : Double, max_tip_length_to_length_ratio? : Double, style? : ShapeStyle) -> Self
+pub fn Arrow::shaft(Self) -> Line
+pub fn Arrow::tip(Self) -> Polygon
+pub impl IntoObject for Arrow
+
+pub(all) struct Axes {
+  x_min : Double
+  x_max : Double
+  x_step : Double
+  y_min : Double
+  y_max : Double
+  y_step : Double
+  x_length : Double
+  y_length : Double
+  tips : Bool
+  tick_size : Double
+  style : ShapeStyle
+}
+pub fn Axes::coords_to_point(Self, Double, Double) -> Vec3
+pub fn Axes::new(x_min? : Double, x_max? : Double, x_step? : Double, y_min? : Double, y_max? : Double, y_step? : Double, x_length? : Double, y_length? : Double, tips? : Bool, tick_size? : Double, style? : ShapeStyle) -> Self
+pub fn Axes::plot(Self, (Double) -> Double, x_min? : Double, x_max? : Double, step? : Double, style? : ShapeStyle) -> ParametricFunction
+pub fn Axes::plot_parametric_curve(Self, (Double) -> Vec3, t_min? : Double, t_max? : Double, step? : Double, style? : ShapeStyle) -> ParametricFunction
+pub fn Axes::point_to_coords(Self, Vec3) -> (Double, Double)
+pub fn Axes::x_axis(Self) -> NumberLine
+pub fn Axes::y_axis(Self) -> NumberLine
+pub impl IntoObject for Axes
+
 pub(all) struct Circle {
   radius : Double
   segments : Int
@@ -54,6 +90,17 @@ pub fn Circle::path(Self) -> Path3D
 pub fn Circle::point_at_angle(Self, Double) -> Vec3
 pub impl IntoObject for Circle
 
+pub(all) struct DashedLine {
+  start : Vec3
+  end : Vec3
+  dash_length : Double
+  dashed_ratio : Double
+  style : ShapeStyle
+}
+pub fn DashedLine::dashes(Self) -> Array[Line]
+pub fn DashedLine::new(start? : Vec3, end? : Vec3, dash_length? : Double, dashed_ratio? : Double, style? : ShapeStyle) -> Self
+pub impl IntoObject for DashedLine
+
 pub(all) struct Dot {
   point : Vec3
   radius : Double
@@ -64,6 +111,18 @@ pub fn Dot::new(point? : Vec3, radius? : Double, segments? : Int, style? : Shape
 pub fn Dot::path(Self) -> Path3D
 pub impl IntoObject for Dot
 pub impl Default for Dot
+
+pub(all) struct FunctionGraph {
+  function : (Double) -> Double
+  x_min : Double
+  x_max : Double
+  step : Double
+  style : ShapeStyle
+}
+pub fn FunctionGraph::new((Double) -> Double, x_min? : Double, x_max? : Double, step? : Double, style? : ShapeStyle) -> Self
+pub fn FunctionGraph::parametric(Self) -> ParametricFunction
+pub fn FunctionGraph::path(Self) -> Path3D
+pub impl IntoObject for FunctionGraph
 
 pub(all) struct Line {
   start : Vec3
@@ -80,6 +139,25 @@ pub(all) enum Node {
   Path(Path3D, ShapeStyle)
 }
 pub fn Node::bounds(Self) -> Aabb?
+
+pub(all) struct NumberLine {
+  x_min : Double
+  x_max : Double
+  x_step : Double
+  length : Double
+  include_ticks : Bool
+  tick_size : Double
+  include_tip : Bool
+  tip_length : Double
+  tip_width : Double
+  style : ShapeStyle
+}
+pub fn NumberLine::new(x_min? : Double, x_max? : Double, x_step? : Double, length? : Double, unit_size? : Double, include_ticks? : Bool, tick_size? : Double, include_tip? : Bool, tip_length? : Double, tip_width? : Double, style? : ShapeStyle) -> Self
+pub fn NumberLine::number_to_point(Self, Double) -> Vec3
+pub fn NumberLine::point_to_number(Self, Vec3) -> Double
+pub fn NumberLine::tick(Self, Double) -> Line
+pub fn NumberLine::tick_values(Self) -> Array[Double]
+pub impl IntoObject for NumberLine
 
 pub(all) struct Object {
   id : String
@@ -104,6 +182,17 @@ pub fn Object::set_stroke(Self, color? : Rgba, width? : Double, opacity? : Doubl
 pub fn Object::with_transform(Self, Transform) -> Self
 pub fn Object::with_z_index(Self, Double) -> Self
 pub impl IntoObject for Object
+
+pub(all) struct ParametricFunction {
+  function : (Double) -> Vec3
+  t_min : Double
+  t_max : Double
+  step : Double
+  style : ShapeStyle
+}
+pub fn ParametricFunction::new((Double) -> Vec3, t_min? : Double, t_max? : Double, step? : Double, style? : ShapeStyle) -> Self
+pub fn ParametricFunction::path(Self) -> Path3D
+pub impl IntoObject for ParametricFunction
 
 pub(all) struct Path3D {
   commands : Array[PathCommand]
