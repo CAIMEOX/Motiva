@@ -11,11 +11,11 @@
 
 name = "CAIMEOX/Motiva"
 
-version = "0.1.0"
+version = "0.2.0"
 
 readme = "README.mbt.md"
 
-repository = ""
+repository = "https://github.com/caimeox/motiva"
 
 license = "Apache-2.0"
 
@@ -26,4 +26,5 @@ description = "A MoonBit animation engine inspired by Manim."
 import {
   "CAIMEOX/cairoon@0.1.0",
   "moonbitlang/async@0.19.1",
+  "moonbit-community/XMLParser@0.2.5",
 }

@@ -1,0 +1,36 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "CAIMEOX/Motiva/svg"
+
+import {
+  "CAIMEOX/Motiva/object",
+}
+
+// Values
+pub fn parse_path_data(String) -> @object.Path3D raise SvgError
+
+pub fn parse_string(String, center? : Bool, height? : Double, width? : Double) -> @object.Object raise SvgError
+
+// Errors
+pub(all) suberror SvgError {
+  InvalidXml
+  InvalidNumber(String)
+  ExpectedNumber(String)
+  MissingAttribute(element~ : String, attribute~ : String)
+  InvalidColor(String)
+  InvalidPathData(String)
+  UnsupportedPathCommand(Char)
+  InvalidTransform(String)
+  UnsupportedElement(String)
+}
+
+// Types and methods
+pub struct SvgObject {
+  // private fields
+}
+pub fn SvgObject::object(Self) -> @object.Object
+pub fn SvgObject::parse_string(String, center? : Bool, height? : Double, width? : Double) -> Self raise SvgError
+
+// Type aliases
+
+// Traits
+

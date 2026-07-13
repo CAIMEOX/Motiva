@@ -1,0 +1,6 @@
+import {
+  "CAIMEOX/Motiva/object",
+  "moonbit-community/XMLParser" @xml,
+  "moonbitlang/core/math",
+  "moonbitlang/core/string",
+}
