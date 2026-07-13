@@ -47,7 +47,7 @@ fn lower_element(
   } else if name == "polyline" {
     lower_poly(element, style, closed=false)
   } else if is_non_rendered_element(name) {
-    @object.Object::empty(id=element_id(element))
+    @object.Object::empty()
   } else {
     raise UnsupportedElement(name)
   }
@@ -68,7 +68,7 @@ fn lower_group(
       _ => ()
     }
   }
-  @object.Object::group(children, id=element_id(element))
+  @object.Object::group(children)
 }
 
 ///|
@@ -77,11 +77,7 @@ fn lower_path(
   style : SvgStyle,
 ) -> @object.Object raise SvgError {
   let data = required_attribute(element, "d")
-  @object.Object::path(
-    parse_path_data(data),
-    style=style.to_shape_style(),
-    id=element_id(element),
-  )
+  @object.Object::path(parse_path_data(data), style=style.to_shape_style())
 }
 
 ///|
@@ -96,11 +92,7 @@ fn lower_line(
   let path = @object.Path3D::empty()
   path.move_to(@object.Vec3::new(x=x1, y=y1))
   path.line_to(@object.Vec3::new(x=x2, y=y2))
-  @object.Object::path(
-    path,
-    style=style.to_shape_style(),
-    id=element_id(element),
-  )
+  @object.Object::path(path, style=style.to_shape_style())
 }
 
 ///|
@@ -118,11 +110,7 @@ fn lower_rect(
   path.line_to(@object.Vec3::new(x=x + width, y=y + height))
   path.line_to(@object.Vec3::new(x~, y=y + height))
   path.close()
-  @object.Object::path(
-    path,
-    style=style.to_shape_style(),
-    id=element_id(element),
-  )
+  @object.Object::path(path, style=style.to_shape_style())
 }
 
 ///|
@@ -136,7 +124,6 @@ fn lower_circle(
   @object.Object::path(
     ellipse_path(cx, cy, radius, radius),
     style=style.to_shape_style(),
-    id=element_id(element),
   )
 }
 
@@ -152,7 +139,6 @@ fn lower_ellipse(
   @object.Object::path(
     ellipse_path(cx, cy, rx, ry),
     style=style.to_shape_style(),
-    id=element_id(element),
   )
 }
 
@@ -164,11 +150,7 @@ fn lower_poly(
 ) -> @object.Object raise SvgError {
   let points = parse_points(required_attribute(element, "points"))
   let path = poly_path(points, closed~)
-  @object.Object::path(
-    path,
-    style=style.to_shape_style(),
-    id=element_id(element),
-  )
+  @object.Object::path(path, style=style.to_shape_style())
 }
 
 ///|
@@ -472,11 +454,6 @@ fn length_attribute(
     None => default
     Some(value) => parse_number_prefix(value, name)
   }
-}
-
-///|
-fn element_id(element : @xml.XMLElement) -> String {
-  element.get_attribute("id").unwrap_or("")
 }
 
 ///|

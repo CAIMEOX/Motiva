@@ -81,13 +81,12 @@ test "shape style setters update specified paint fields" {
 test "object style setters recurse through groups" {
   let fill = Rgba::rgb(r=0.0, g=0.4, b=1.0)
   let stroke = Rgba::rgb(r=0.9, g=0.9, b=0.1)
-  let group = Object::group(
-      [into_object(Square::new()), into_object(Circle::new())],
-      id="group",
-    )
+  let group = Object::group([
+      into_object(Square::new()),
+      into_object(Circle::new()),
+    ])
     .set_fill(color=fill, opacity=0.35)
     .set_stroke(color=stroke, width=3.0, opacity=0.8)
-  assert_eq(group.id, "group")
   guard group.node is Group(children) else {
     fail("styled group should stay a group")
   }

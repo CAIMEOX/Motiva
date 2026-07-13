@@ -521,7 +521,6 @@ fn sample_create_object(
 ) -> @object.Object {
   @object.Object::new(
     node=sample_create_node(source.node, alpha),
-    id=source.id,
     transform=source.transform,
     z_index=source.z_index,
   )
@@ -675,7 +674,6 @@ fn sample_draw_border_then_fill(
 fn make_outline_object(source : @object.Object) -> @object.Object {
   @object.Object::new(
     node=make_outline_node(source.node),
-    id=source.id,
     transform=source.transform,
     z_index=source.z_index,
   )

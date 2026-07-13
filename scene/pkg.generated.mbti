@@ -35,7 +35,7 @@ pub fn[T : IntoAnimation] Animation::lagged_start(Array[T], run_time? : Double, 
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
 pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::scale(ObjectId, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
-pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, name? : String) -> Self
+pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::wait(Double) -> Self
 pub fn Animation::with_lag_ratio(Self, Double) -> Self
 pub fn Animation::with_rate_func(Self, RateFunc) -> Self
@@ -207,8 +207,8 @@ pub(all) struct Scene {
   config : SceneConfig
   mut play_writer : PlayWriter?
 }
-pub fn[T : @object.IntoObject] Scene::add(Self, T, id? : String) -> ObjectId
-pub fn[T : @object.IntoObject] Scene::add_foreground(Self, T, id? : String) -> ObjectId
+pub fn[T : @object.IntoObject] Scene::add(Self, T) -> ObjectId
+pub fn[T : @object.IntoObject] Scene::add_foreground(Self, T) -> ObjectId
 pub fn Scene::children(Self, ObjectId) -> Array[ObjectId] raise SceneError
 pub fn Scene::clear(Self) -> Unit
 pub fn[T : IntoAnimation] Scene::compile_play_plan(Self, Array[T], config? : PlayConfig) -> PlayPlan raise SceneError
@@ -217,14 +217,14 @@ pub fn Scene::foreground_objects(Self) -> Array[ObjectId]
 pub fn Scene::get(Self, ObjectId) -> @object.Object?
 pub fn Scene::is_visible(Self, ObjectId) -> Bool
 pub fn Scene::new(config? : SceneConfig) -> Self
-pub fn[T : @object.IntoObject] Scene::object(Self, T, id? : String) -> ObjectId
+pub fn[T : @object.IntoObject] Scene::object(Self, T) -> ObjectId
 pub fn Scene::object_count(Self) -> Int
 pub fn Scene::parent(Self, ObjectId) -> ObjectId? raise SceneError
 pub fn[T : IntoAnimation] Scene::play(Self, Array[T]) -> Unit raise SceneError
 pub fn Scene::play_immediate(Self, Array[Animation], config? : PlayConfig) -> Unit raise SceneError
 pub fn Scene::remove(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::remove_foreground(Self, ObjectId) -> Unit raise SceneError
-pub fn[T : @object.IntoObject] Scene::replace(Self, ObjectId, T, name? : String) -> Unit raise SceneError
+pub fn[T : @object.IntoObject] Scene::replace(Self, ObjectId, T) -> Unit raise SceneError
 pub fn Scene::set_play_writer(Self, PlayWriter?) -> Unit
 pub fn Scene::show(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::show_foreground(Self, ObjectId) -> Unit raise SceneError

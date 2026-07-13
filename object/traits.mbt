@@ -1,14 +1,14 @@
 ///|
 pub trait IntoObject {
-  fn to_object(Self, id? : String) -> Object
+  fn to_object(Self) -> Object
 }
 
 ///|
-pub fn[T : IntoObject] into_object(value : T, id? : String = "") -> Object {
-  value.to_object(id~)
+pub fn[T : IntoObject] into_object(value : T) -> Object {
+  value.to_object()
 }
 
 ///|
-pub impl IntoObject for Object with fn to_object(self, id? : String = "") -> Object {
-  { ..self, id, }
+pub impl IntoObject for Object with fn to_object(self) -> Object {
+  self
 }

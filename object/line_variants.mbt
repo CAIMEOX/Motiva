@@ -45,8 +45,8 @@ pub fn DashedLine::dashes(self : DashedLine) -> Array[Line] {
 }
 
 ///|
-pub impl IntoObject for DashedLine with fn to_object(self, id? : String = "") -> Object {
-  Object::group(self.dashes().map(dash => into_object(dash)), id~)
+pub impl IntoObject for DashedLine with fn to_object(self) -> Object {
+  Object::group(self.dashes().map(dash => into_object(dash)))
 }
 
 ///|
@@ -100,32 +100,29 @@ pub fn Arrow::tip(self : Arrow) -> Polygon {
 }
 
 ///|
-pub impl IntoObject for Arrow with fn to_object(self, id? : String = "") -> Object {
+pub impl IntoObject for Arrow with fn to_object(self) -> Object {
   let metrics = self.metrics()
   if metrics.available_length <= 0.0 {
-    Object::empty(id~)
+    Object::empty()
   } else {
-    Object::group(
-      [
-        into_object(
-          Line::new(
-            start=metrics.shaft_start,
-            end=metrics.shaft_end,
-            style=self.style,
-          ),
+    Object::group([
+      into_object(
+        Line::new(
+          start=metrics.shaft_start,
+          end=metrics.shaft_end,
+          style=self.style,
         ),
-        into_object(
-          arrow_tip_polygon(
-            tip=metrics.tip,
-            direction=metrics.direction,
-            length=metrics.tip_length,
-            width=self.tip_width,
-            style=arrow_tip_style(self.style),
-          ),
+      ),
+      into_object(
+        arrow_tip_polygon(
+          tip=metrics.tip,
+          direction=metrics.direction,
+          length=metrics.tip_length,
+          width=self.tip_width,
+          style=arrow_tip_style(self.style),
         ),
-      ],
-      id~,
-    )
+      ),
+    ])
   }
 }
 

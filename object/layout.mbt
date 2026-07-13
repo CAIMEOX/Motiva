@@ -62,7 +62,6 @@ pub fn Object::arrange(
       }
       let group = Object::new(
         node=Group(arranged),
-        id=self.id,
         transform=Transform::identity(),
         z_index=self.z_index,
       )

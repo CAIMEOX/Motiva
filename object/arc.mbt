@@ -57,6 +57,6 @@ pub fn Arc::path(self : Arc) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for Arc with fn to_object(self, id? : String = "") -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for Arc with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }

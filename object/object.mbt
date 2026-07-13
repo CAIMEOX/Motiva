@@ -1,6 +1,5 @@
 ///|
 pub(all) struct Object {
-  id : String
   transform : Transform
   z_index : Double
   node : Node
@@ -16,35 +15,33 @@ pub(all) enum Node {
 ///|
 pub fn Object::new(
   node~ : Node,
-  id? : String = "",
   transform? : Transform = Transform::identity(),
   z_index? : Double = 0.0,
 ) -> Object {
-  { id, transform, z_index, node }
+  { transform, z_index, node }
 }
 
 ///|
-pub fn Object::empty(id? : String = "") -> Object {
-  Object::new(node=Empty, id~)
+pub fn Object::empty() -> Object {
+  Object::new(node=Empty)
 }
 
 ///|
-pub fn Object::group(children : Array[Object], id? : String = "") -> Object {
-  Object::new(node=Group(children), id~)
+pub fn Object::group(children : Array[Object]) -> Object {
+  Object::new(node=Group(children))
 }
 
 ///|
 pub fn Object::path(
   path : Path3D,
   style? : ShapeStyle = ShapeStyle::default(),
-  id? : String = "",
 ) -> Object {
-  Object::new(node=Path(path, style), id~)
+  Object::new(node=Path(path, style))
 }
 
 ///|
 pub fn Object::with_transform(self : Object, transform : Transform) -> Object {
-  { id: self.id, transform, z_index: self.z_index, node: self.node }
+  { transform, z_index: self.z_index, node: self.node }
 }
 
 ///|
@@ -53,7 +50,7 @@ pub fn Object::with_z_index(self : Object, z_index : Double) -> Object {
     Group(children) => Group(children.map(child => child.with_z_index(z_index)))
     _ => self.node
   }
-  { id: self.id, transform: self.transform, z_index, node }
+  { transform: self.transform, z_index, node }
 }
 
 ///|
@@ -63,7 +60,6 @@ pub fn Object::set_fill(
   opacity? : Double,
 ) -> Object {
   {
-    id: self.id,
     transform: self.transform,
     z_index: self.z_index,
     node: self.node.set_fill(color?, opacity?),
@@ -78,7 +74,6 @@ pub fn Object::set_stroke(
   opacity? : Double,
 ) -> Object {
   {
-    id: self.id,
     transform: self.transform,
     z_index: self.z_index,
     node: self.node.set_stroke(color?, width?, opacity?),
@@ -88,7 +83,6 @@ pub fn Object::set_stroke(
 ///|
 pub fn Object::set_color(self : Object, color : Rgba) -> Object {
   {
-    id: self.id,
     transform: self.transform,
     z_index: self.z_index,
     node: self.node.set_color(color),

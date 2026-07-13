@@ -61,7 +61,6 @@ fn Scene::materialize_local_object(
         })
         @object.Object::new(
           node=Group(children),
-          id=scene_object.object.id,
           transform=scene_object.object.transform,
           z_index=scene_object.object.z_index,
         )
@@ -281,7 +280,6 @@ fn Scene::set_subtree_state(
 fn family_shell(object : @object.Object) -> @object.Object {
   @object.Object::new(
     node=Group([]),
-    id=object.id,
     transform=object.transform,
     z_index=object.z_index,
   )

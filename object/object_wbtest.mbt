@@ -34,7 +34,7 @@ fn eval_result(path : Path3D) -> Result[PathBuffer3D, PathEvalError] {
 ///|
 test "circle lowers to path object" {
   let circle = Circle::new(radius=2.0)
-  let object = into_object(circle, id="circle")
+  let object = into_object(circle)
   guard object.node is Path(path, style) else {
     fail("Circle should lower to Node::Path")
   }
@@ -107,7 +107,7 @@ test "circle path eval lowers to one cubic segment per arc segment" {
 ///|
 test "square lowers to path object" {
   let square = Square::new(side_length=4.0)
-  let object = into_object(square, id="square")
+  let object = into_object(square)
   guard object.node is Path(path, style) else {
     fail("Square should lower to Node::Path")
   }
@@ -143,7 +143,7 @@ test "line lowers to an open path object" {
     start=Vec3::new(x=-1.0, y=2.0, z=0.5),
     end=Vec3::new(x=3.0, y=-2.0, z=0.5),
   )
-  let object = into_object(line, id="line")
+  let object = into_object(line)
   guard object.node is Path(path, _) else {
     fail("Line should lower to Node::Path")
   }
@@ -171,7 +171,7 @@ test "polygon lowers vertices to a closed path" {
     Vec3::new(x=2.0, y=-1.0),
     Vec3::new(x=0.0, y=2.0),
   ])
-  let object = into_object(polygon, id="polygon")
+  let object = into_object(polygon)
   guard object.node is Path(path, _) else {
     fail("Polygon should lower to Node::Path")
   }
@@ -194,7 +194,7 @@ test "polygon lowers vertices to a closed path" {
 ///|
 test "rectangle is centered at origin with width and height" {
   let rectangle = Rectangle::new(width=4.0, height=2.0)
-  let object = into_object(rectangle, id="rectangle")
+  let object = into_object(rectangle)
   guard object.node is Path(path, _) else {
     fail("Rectangle should lower to Node::Path")
   }
@@ -211,7 +211,7 @@ test "rectangle is centered at origin with width and height" {
 ///|
 test "dot is a filled circle centered at its point" {
   let dot = Dot::new(point=Vec3::new(x=1.0, y=-2.0), radius=0.25, segments=8)
-  let object = into_object(dot, id="dot")
+  let object = into_object(dot)
   guard object.node is Path(path, style) else {
     fail("Dot should lower to Node::Path")
   }

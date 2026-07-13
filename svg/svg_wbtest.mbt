@@ -62,7 +62,6 @@ test "rect lowers to a styled path and root y flip" {
   guard children[0].node is @object.Path(path, style) else {
     fail("rect should lower to a path")
   }
-  assert_eq(children[0].id, "box")
   assert_eq(path.commands.length(), 5)
   guard style.fill is Some(fill) else { fail("rect fill should be parsed") }
   assert_close(fill.r, 1.0)

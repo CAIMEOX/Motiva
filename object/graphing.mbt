@@ -81,7 +81,7 @@ pub fn NumberLine::tick(self : NumberLine, value : Double) -> Line {
 }
 
 ///|
-pub impl IntoObject for NumberLine with fn to_object(self, id? : String = "") -> Object {
+pub impl IntoObject for NumberLine with fn to_object(self) -> Object {
   let children : Array[Object] = []
   children.push(
     into_object(
@@ -110,7 +110,7 @@ pub impl IntoObject for NumberLine with fn to_object(self, id? : String = "") ->
       ),
     )
   }
-  Object::group(children, id~)
+  Object::group(children)
 }
 
 ///|
@@ -241,16 +241,13 @@ pub fn Axes::plot_parametric_curve(
 }
 
 ///|
-pub impl IntoObject for Axes with fn to_object(self, id? : String = "") -> Object {
-  Object::group(
-    [
-      into_object(self.x_axis()),
-      into_object(self.y_axis()).with_transform(
-        Transform::rotate(angle=@math.PI / 2.0),
-      ),
-    ],
-    id~,
-  )
+pub impl IntoObject for Axes with fn to_object(self) -> Object {
+  Object::group([
+    into_object(self.x_axis()),
+    into_object(self.y_axis()).with_transform(
+      Transform::rotate(angle=@math.PI / 2.0),
+    ),
+  ])
 }
 
 ///|
@@ -279,11 +276,8 @@ pub fn ParametricFunction::path(self : ParametricFunction) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for ParametricFunction with fn to_object(
-  self,
-  id? : String = "",
-) -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for ParametricFunction with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }
 
 ///|
@@ -323,8 +317,8 @@ pub fn FunctionGraph::path(self : FunctionGraph) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for FunctionGraph with fn to_object(self, id? : String = "") -> Object {
-  into_object(self.parametric(), id~)
+pub impl IntoObject for FunctionGraph with fn to_object(self) -> Object {
+  into_object(self.parametric())
 }
 
 ///|

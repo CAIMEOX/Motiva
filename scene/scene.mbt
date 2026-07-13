@@ -105,21 +105,13 @@ pub fn Scene::set_play_writer(self : Scene, writer : PlayWriter?) -> Unit {
 }
 
 ///|
-pub fn[T : @object.IntoObject] Scene::object(
-  self : Scene,
-  x : T,
-  id? : String = "",
-) -> ObjectId {
-  self.insert_object(@object.into_object(x, id~), Allocated)
+pub fn[T : @object.IntoObject] Scene::object(self : Scene, x : T) -> ObjectId {
+  self.insert_object(@object.into_object(x), Allocated)
 }
 
 ///|
-pub fn[T : @object.IntoObject] Scene::add(
-  self : Scene,
-  x : T,
-  id? : String = "",
-) -> ObjectId {
-  let object_id = self.insert_object(@object.into_object(x, id~), Visible)
+pub fn[T : @object.IntoObject] Scene::add(self : Scene, x : T) -> ObjectId {
+  let object_id = self.insert_object(@object.into_object(x), Visible)
   self.draw_order.push(object_id)
   object_id
 }
@@ -128,9 +120,8 @@ pub fn[T : @object.IntoObject] Scene::add(
 pub fn[T : @object.IntoObject] Scene::add_foreground(
   self : Scene,
   x : T,
-  id? : String = "",
 ) -> ObjectId {
-  let object_id = self.add(x, id~)
+  let object_id = self.add(x)
   self.foreground.push(object_id)
   object_id
 }
@@ -186,9 +177,8 @@ pub fn[T : @object.IntoObject] Scene::replace(
   self : Scene,
   id : ObjectId,
   x : T,
-  name? : String = "",
 ) -> Unit raise SceneError {
-  self.replace_object(id, x.to_object(id=name))
+  self.replace_object(id, x.to_object())
 }
 
 ///|

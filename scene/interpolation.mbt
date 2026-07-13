@@ -7,7 +7,6 @@ fn interpolate_object(
   let t = clamp_alpha(alpha)
   @object.Object::new(
     node=interpolate_node(start.node, target.node, t),
-    id=if t >= 1.0 { target.id } else { start.id },
     transform=interpolate_transform(start.transform, target.transform, t),
     z_index=lerp_double(start.z_index, target.z_index, t),
   )

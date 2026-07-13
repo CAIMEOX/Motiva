@@ -32,8 +32,8 @@ pub fn Circle::path(self : Circle) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for Circle with fn to_object(self, id? : String = "") -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for Circle with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }
 
 ///|
@@ -66,8 +66,8 @@ pub fn Line::path(self : Line) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for Line with fn to_object(self, id? : String = "") -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for Line with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }
 
 ///|
@@ -90,8 +90,8 @@ pub fn Polygon::path(self : Polygon) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for Polygon with fn to_object(self, id? : String = "") -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for Polygon with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }
 
 ///|
@@ -131,8 +131,8 @@ pub fn Rectangle::path(self : Rectangle) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for Rectangle with fn to_object(self, id? : String = "") -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for Rectangle with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }
 
 ///|
@@ -159,8 +159,8 @@ pub fn Square::path(self : Square) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for Square with fn to_object(self, id? : String = "") -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for Square with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }
 
 ///|
@@ -211,8 +211,8 @@ pub fn Dot::path(self : Dot) -> Path3D {
 }
 
 ///|
-pub impl IntoObject for Dot with fn to_object(self, id? : String = "") -> Object {
-  Object::path(self.path(), style=self.style, id~)
+pub impl IntoObject for Dot with fn to_object(self) -> Object {
+  Object::path(self.path(), style=self.style)
 }
 
 ///|
