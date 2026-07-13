@@ -1,20 +1,17 @@
 import {
-  "CAIMEOX/cairoon",
-  "CAIMEOX/Motiva/ffmpeg",
   "CAIMEOX/Motiva/object",
+  "CAIMEOX/Motiva/render",
   "CAIMEOX/Motiva/scene",
-}
-
-import {
   "CAIMEOX/Motiva/svg",
   "CAIMEOX/Motiva/svg/loader",
   "moonbitlang/async",
-  "moonbitlang/core/test",
-} for "test"
+  "moonbitlang/core/math",
+}
 
 supported_targets = "+native"
 
 options(
+  "is-main": true,
   link: {
     "native": {
       "cc-link-flags": "-L/opt/homebrew/Cellar/cairo/1.18.4/lib -lcairo",

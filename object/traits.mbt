@@ -1,5 +1,5 @@
 ///|
-pub trait IntoObject {
+pub(open) trait IntoObject {
   fn to_object(Self) -> Object
 }
 

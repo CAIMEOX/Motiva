@@ -14,6 +14,16 @@ fn assert_render_close(actual : Double, expected : Double) -> Unit raise {
 }
 
 ///|
+fn assert_pixel_bytes_equal(actual : Bytes, expected : Bytes) -> Unit raise {
+  assert_eq(actual.length(), expected.length())
+  for index in 0..<actual.length() {
+    if actual[index] != expected[index] {
+      fail("pixel data differs at byte \{index}")
+    }
+  }
+}
+
+///|
 test "snapshot separates foreground from main draw items" {
   let scene = @scene.Scene::new()
   let square = scene.add(@object.Square::new())
@@ -131,6 +141,63 @@ test "cairo renderer renders visible path objects into argb32 bytes" {
   assert_eq(frame.height, 64)
   assert_eq(frame.byte_length(), 64 * 64 * 4)
   assert_true(has_nonzero_byte(frame.data))
+}
+
+///|
+test "SVG context rendering matches PNG golden" {
+  let source =
+    #|<svg xmlns="http://www.w3.org/2000/svg" width="4" height="2" viewBox="0 0 40 20">
+    #|  <defs>
+    #|    <symbol id="tile" viewBox="0 0 10 10">
+    #|      <rect width="10" height="10" rx="2" fill="currentColor" />
+    #|    </symbol>
+    #|  </defs>
+    #|  <use href="#tile" width="20" height="20" color="red" />
+    #|  <use href="#tile" x="20" width="20" height="20" color="blue" />
+    #|</svg>
+  let scene = @scene.Scene::new()
+  ignore(scene.add(@svg.SvgObject::parse_string(source, center=false)))
+  let renderer = CairoRenderer::new(
+    camera=Camera::new(
+      pixel_width=80,
+      pixel_height=40,
+      frame_width=4.0,
+      frame_height=2.0,
+      frame_center=@object.Vec3::new(x=2.0, y=-1.0),
+      background=@object.Rgba::black(),
+    ),
+  )
+  let actual = renderer.render_scene(scene).data
+  let golden = @cairoon.Surface::image_from_png(
+    "render/testdata/svg_context_golden.png",
+  )
+  golden.flush()
+  assert_pixel_bytes_equal(actual, golden.copy_data())
+}
+
+///|
+async test "Manim SVG fixture rendering matches PNG golden" {
+  let svg = @loader.SvgLoader::new().load(
+    "svg/testdata/manim/A.svg",
+    height=3.0,
+  )
+  let scene = @scene.Scene::new()
+  ignore(scene.add(svg))
+  let renderer = CairoRenderer::new(
+    camera=Camera::new(
+      pixel_width=160,
+      pixel_height=90,
+      frame_width=8.0,
+      frame_height=4.5,
+      background=@object.Rgba::black(),
+    ),
+  )
+  let actual = renderer.render_scene(scene).data
+  let golden = @cairoon.Surface::image_from_png(
+    "render/testdata/manim_A_golden.png",
+  )
+  golden.flush()
+  assert_pixel_bytes_equal(actual, golden.copy_data())
 }
 
 ///|

@@ -1,0 +1,12 @@
+import {
+  "CAIMEOX/Motiva/svg",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/io",
+}
+
+import {
+  "CAIMEOX/Motiva/object",
+  "moonbitlang/async",
+} for "test"
+
+supported_targets = "+native"

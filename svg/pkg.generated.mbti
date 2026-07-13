@@ -20,15 +20,21 @@ pub(all) suberror SvgError {
   InvalidPathData(String)
   UnsupportedPathCommand(Char)
   InvalidTransform(String)
+  InvalidLength(String)
+  InvalidViewBox(String)
   UnsupportedElement(String)
+  MissingReference(String)
+  CyclicReference(String)
 }
 
 // Types and methods
 pub struct SvgObject {
   // private fields
 }
+pub fn SvgObject::copy(Self) -> Self
 pub fn SvgObject::object(Self) -> @object.Object
 pub fn SvgObject::parse_string(String, center? : Bool, height? : Double, width? : Double) -> Self raise SvgError
+pub impl @object.IntoObject for SvgObject
 
 // Type aliases
 

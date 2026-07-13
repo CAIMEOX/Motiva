@@ -9,7 +9,13 @@ pub fn SvgObject::parse_string(
     Some(document) => document
     None => raise InvalidXml
   }
-  let object = lower_element(document.root, SvgStyle::default())
+  let definitions : Map[String, @xml.XMLElement] = {}
+  collect_definitions(document.root, definitions)
+  let object = evaluate_element(
+    document.root,
+    SvgContext::root(definitions),
+    referenced=false,
+  ).unwrap_or(@object.Object::empty())
   { object: normalize_svg_object(object, center~, height?, width?) }
 }
 
@@ -24,51 +30,281 @@ pub fn parse_string(
 }
 
 ///|
-fn lower_element(
-  element : @xml.XMLElement,
-  inherited_style : SvgStyle,
-) -> @object.Object raise SvgError {
-  let name = local_name(element.name)
-  let style = inherited_style.apply_element(element)
-  let base = if name == "svg" || name == "g" {
-    lower_group(element, style)
-  } else if name == "path" {
-    lower_path(element, style)
-  } else if name == "line" {
-    lower_line(element, style)
-  } else if name == "rect" {
-    lower_rect(element, style)
-  } else if name == "circle" {
-    lower_circle(element, style)
-  } else if name == "ellipse" {
-    lower_ellipse(element, style)
-  } else if name == "polygon" {
-    lower_poly(element, style, closed=true)
-  } else if name == "polyline" {
-    lower_poly(element, style, closed=false)
-  } else if is_non_rendered_element(name) {
-    @object.Object::empty()
-  } else {
-    raise UnsupportedElement(name)
-  }
-  let transform = parse_transform_attribute(element)
-  base.with_transform(base.transform.then(transform))
+priv struct ResolvedViewport {
+  user : SvgViewport
+  transform : @object.Transform
+  empty : Bool
 }
 
 ///|
-fn lower_group(
+fn evaluate_element(
   element : @xml.XMLElement,
-  style : SvgStyle,
+  context : SvgContext,
+  referenced~ : Bool,
+) -> @object.Object? raise SvgError {
+  let name = local_name(element.name)
+  if name == "svg" {
+    return evaluate_svg_element(element, context)
+  }
+  let style = context.style.apply_element(element, context.viewport)
+  if !style.displayed {
+    return None
+  }
+  let local_transform = parse_transform_attribute(element)
+  let context = context.enter(style, local_transform)
+  if !style.visible && is_shape_element(name) {
+    return None
+  }
+  let base = match name {
+    "g" => Some(evaluate_group(element, context))
+    "symbol" if referenced => Some(evaluate_group(element, context))
+    "symbol" => None
+    "use" => evaluate_use(element, context)
+    "path" => Some(lower_path(element, style).with_transform(context.transform))
+    "line" =>
+      Some(
+        lower_line(element, style, context.viewport).with_transform(
+          context.transform,
+        ),
+      )
+    "rect" =>
+      Some(
+        lower_rect(element, style, context.viewport).with_transform(
+          context.transform,
+        ),
+      )
+    "circle" =>
+      Some(
+        lower_circle(element, style, context.viewport).with_transform(
+          context.transform,
+        ),
+      )
+    "ellipse" =>
+      Some(
+        lower_ellipse(element, style, context.viewport).with_transform(
+          context.transform,
+        ),
+      )
+    "polygon" =>
+      Some(
+        lower_poly(element, style, closed=true).with_transform(
+          context.transform,
+        ),
+      )
+    "polyline" =>
+      Some(
+        lower_poly(element, style, closed=false).with_transform(
+          context.transform,
+        ),
+      )
+    _ if is_non_rendered_element(name) => None
+    _ => raise UnsupportedElement(name)
+  }
+  base
+}
+
+///|
+fn evaluate_svg_element(
+  element : @xml.XMLElement,
+  context : SvgContext,
+) -> @object.Object? raise SvgError {
+  let viewport = resolve_svg_viewport(element, context.viewport)
+  let style = context.style.apply_element(element, viewport.user)
+  if !style.displayed {
+    return None
+  }
+  let context = context.enter(style, parse_transform_attribute(element))
+  if viewport.empty {
+    Some(@object.Object::empty())
+  } else {
+    Some(
+      evaluate_group(
+        element,
+        context.enter_viewport(viewport.user, viewport.transform),
+      ),
+    )
+  }
+}
+
+///|
+fn resolve_svg_viewport(
+  element : @xml.XMLElement,
+  parent : SvgViewport,
+) -> ResolvedViewport raise SvgError {
+  let view_box = parse_view_box(element)
+  let width = length_attribute_in(
+    element,
+    "width",
+    Horizontal,
+    parent,
+    default=parent.width,
+  )
+  let height = length_attribute_in(
+    element,
+    "height",
+    Vertical,
+    parent,
+    default=parent.height,
+  )
+  if width < 0.0 || height < 0.0 {
+    raise InvalidLength("svg viewport")
+  }
+  let physical = { width, height }
+  let user = view_box.map_or(physical, box => {
+    width: box.width,
+    height: box.height,
+  })
+  let empty = width == 0.0 || height == 0.0
+  let transform = if empty {
+    @object.Transform::identity()
+  } else {
+    let x = length_attribute_in(element, "x", Horizontal, parent, default=0.0)
+    let y = length_attribute_in(element, "y", Vertical, parent, default=0.0)
+    viewport_transform(physical, view_box, parse_aspect_ratio(element), x, y)
+  }
+  { user, transform, empty }
+}
+
+///|
+fn evaluate_group(
+  element : @xml.XMLElement,
+  context : SvgContext,
 ) -> @object.Object raise SvgError {
   let children : Array[@object.Object] = []
   for child in element.children {
     match child {
       Element(child_element) =>
-        children.push(lower_element(child_element, style))
+        match evaluate_element(child_element, context, referenced=false) {
+          Some(object) => children.push(object)
+          None => ()
+        }
       _ => ()
     }
   }
   @object.Object::group(children)
+}
+
+///|
+fn evaluate_use(
+  element : @xml.XMLElement,
+  context : SvgContext,
+) -> @object.Object? raise SvgError {
+  let href = match
+    (element.get_attribute("href"), element.get_attribute("xlink:href")) {
+    (Some(value), _) => value
+    (None, Some(value)) => value
+    (None, None) => raise MissingReference("")
+  }
+  let id = reference_id(href)
+  let target = match context.definitions.get(id) {
+    Some(target) => target
+    None => raise MissingReference(id)
+  }
+  let positioned = context.translate(
+    length_attribute_in(element, "x", Horizontal, context.viewport, default=0.0),
+    length_attribute_in(element, "y", Vertical, context.viewport, default=0.0),
+  )
+  let referenced_context = positioned.follow(id)
+  if local_name(target.name) == "symbol" {
+    evaluate_symbol(target, element, referenced_context)
+  } else {
+    evaluate_element(target, referenced_context, referenced=true)
+  }
+}
+
+///|
+fn evaluate_symbol(
+  symbol : @xml.XMLElement,
+  use_element : @xml.XMLElement,
+  context : SvgContext,
+) -> @object.Object? raise SvgError {
+  let view_box = parse_view_box(symbol)
+  let parent = context.viewport
+  let width = instance_length(
+    use_element,
+    symbol,
+    "width",
+    Horizontal,
+    parent,
+    view_box.map_or(parent.width, box => box.width),
+  )
+  let height = instance_length(
+    use_element,
+    symbol,
+    "height",
+    Vertical,
+    parent,
+    view_box.map_or(parent.height, box => box.height),
+  )
+  if width < 0.0 || height < 0.0 {
+    raise InvalidLength("symbol viewport")
+  }
+  let viewport = { width, height }
+  let user_viewport = view_box.map_or(viewport, box => {
+    width: box.width,
+    height: box.height,
+  })
+  let style = context.style.apply_element(symbol, user_viewport)
+  if !style.displayed {
+    return None
+  }
+  let context = context.enter(style, parse_transform_attribute(symbol))
+  if width == 0.0 || height == 0.0 {
+    None
+  } else {
+    let transform = viewport_transform(
+      viewport,
+      view_box,
+      parse_aspect_ratio(symbol),
+      0.0,
+      0.0,
+    )
+    Some(
+      evaluate_group(symbol, context.enter_viewport(user_viewport, transform)),
+    )
+  }
+}
+
+///|
+fn instance_length(
+  instance : @xml.XMLElement,
+  definition : @xml.XMLElement,
+  name : String,
+  axis : SvgLengthAxis,
+  viewport : SvgViewport,
+  default : Double,
+) -> Double raise SvgError {
+  match (instance.get_attribute(name), definition.get_attribute(name)) {
+    (Some(value), _) | (None, Some(value)) =>
+      parse_length(value, axis, viewport, name)
+    (None, None) => default
+  }
+}
+
+///|
+fn reference_id(href : String) -> String raise SvgError {
+  if href.has_prefix("#") && href.length() > 1 {
+    href.unsafe_substring(start=1, end=href.length())
+  } else {
+    raise MissingReference(href)
+  }
+}
+
+///|
+fn collect_definitions(
+  element : @xml.XMLElement,
+  definitions : Map[String, @xml.XMLElement],
+) -> Unit {
+  match element.get_attribute("id") {
+    Some(id) if id != "" => definitions[id] = element
+    _ => ()
+  }
+  for child in element.children {
+    match child {
+      Element(child_element) => collect_definitions(child_element, definitions)
+      _ => ()
+    }
+  }
 }
 
 ///|
@@ -84,11 +320,12 @@ fn lower_path(
 fn lower_line(
   element : @xml.XMLElement,
   style : SvgStyle,
+  viewport : SvgViewport,
 ) -> @object.Object raise SvgError {
-  let x1 = length_attribute(element, "x1", default=0.0)
-  let y1 = length_attribute(element, "y1", default=0.0)
-  let x2 = length_attribute(element, "x2", default=0.0)
-  let y2 = length_attribute(element, "y2", default=0.0)
+  let x1 = length_attribute_in(element, "x1", Horizontal, viewport, default=0.0)
+  let y1 = length_attribute_in(element, "y1", Vertical, viewport, default=0.0)
+  let x2 = length_attribute_in(element, "x2", Horizontal, viewport, default=0.0)
+  let y2 = length_attribute_in(element, "y2", Vertical, viewport, default=0.0)
   let path = @object.Path3D::empty()
   path.move_to(@object.Vec3::new(x=x1, y=y1))
   path.line_to(@object.Vec3::new(x=x2, y=y2))
@@ -99,28 +336,109 @@ fn lower_line(
 fn lower_rect(
   element : @xml.XMLElement,
   style : SvgStyle,
+  viewport : SvgViewport,
 ) -> @object.Object raise SvgError {
-  let x = length_attribute(element, "x", default=0.0)
-  let y = length_attribute(element, "y", default=0.0)
-  let width = required_length_attribute(element, "width")
-  let height = required_length_attribute(element, "height")
-  let path = @object.Path3D::empty()
-  path.move_to(@object.Vec3::new(x~, y~))
-  path.line_to(@object.Vec3::new(x=x + width, y~))
-  path.line_to(@object.Vec3::new(x=x + width, y=y + height))
-  path.line_to(@object.Vec3::new(x~, y=y + height))
-  path.close()
+  let x = length_attribute_in(element, "x", Horizontal, viewport, default=0.0)
+  let y = length_attribute_in(element, "y", Vertical, viewport, default=0.0)
+  let width = required_length_attribute_in(
+    element,
+    "width",
+    Horizontal,
+    viewport,
+  )
+  let height = required_length_attribute_in(
+    element,
+    "height",
+    Vertical,
+    viewport,
+  )
+  if width < 0.0 || height < 0.0 {
+    raise InvalidLength("rect")
+  }
+  let radius_x = optional_length_attribute_in(
+    element,
+    "rx",
+    Horizontal,
+    viewport,
+  )
+  let radius_y = optional_length_attribute_in(element, "ry", Vertical, viewport)
+  let (rx, ry) = match (radius_x, radius_y) {
+    (None, None) => (0.0, 0.0)
+    (Some(rx), None) => (rx, rx)
+    (None, Some(ry)) => (ry, ry)
+    (Some(rx), Some(ry)) => (rx, ry)
+  }
+  if rx < 0.0 || ry < 0.0 {
+    raise InvalidLength("rect radius")
+  }
+  let path = rect_path(
+    x,
+    y,
+    width,
+    height,
+    Double::min(rx, width / 2.0),
+    Double::min(ry, height / 2.0),
+  )
   @object.Object::path(path, style=style.to_shape_style())
+}
+
+///|
+fn rect_path(
+  x : Double,
+  y : Double,
+  width : Double,
+  height : Double,
+  rx : Double,
+  ry : Double,
+) -> @object.Path3D {
+  let path = @object.Path3D::empty()
+  if rx == 0.0 || ry == 0.0 {
+    path.move_to(@object.Vec3::new(x~, y~))
+    path.line_to(@object.Vec3::new(x=x + width, y~))
+    path.line_to(@object.Vec3::new(x=x + width, y=y + height))
+    path.line_to(@object.Vec3::new(x~, y=y + height))
+    path.close()
+  } else {
+    let kappa = 0.5522847498307936
+    path.move_to(@object.Vec3::new(x=x + rx, y~))
+    path.line_to(@object.Vec3::new(x=x + width - rx, y~))
+    path.cubic_to(
+      @object.Vec3::new(x=x + width - rx + kappa * rx, y~),
+      @object.Vec3::new(x=x + width, y=y + ry - kappa * ry),
+      @object.Vec3::new(x=x + width, y=y + ry),
+    )
+    path.line_to(@object.Vec3::new(x=x + width, y=y + height - ry))
+    path.cubic_to(
+      @object.Vec3::new(x=x + width, y=y + height - ry + kappa * ry),
+      @object.Vec3::new(x=x + width - rx + kappa * rx, y=y + height),
+      @object.Vec3::new(x=x + width - rx, y=y + height),
+    )
+    path.line_to(@object.Vec3::new(x=x + rx, y=y + height))
+    path.cubic_to(
+      @object.Vec3::new(x=x + rx - kappa * rx, y=y + height),
+      @object.Vec3::new(x~, y=y + height - ry + kappa * ry),
+      @object.Vec3::new(x~, y=y + height - ry),
+    )
+    path.line_to(@object.Vec3::new(x~, y=y + ry))
+    path.cubic_to(
+      @object.Vec3::new(x~, y=y + ry - kappa * ry),
+      @object.Vec3::new(x=x + rx - kappa * rx, y~),
+      @object.Vec3::new(x=x + rx, y~),
+    )
+    path.close()
+  }
+  path
 }
 
 ///|
 fn lower_circle(
   element : @xml.XMLElement,
   style : SvgStyle,
+  viewport : SvgViewport,
 ) -> @object.Object raise SvgError {
-  let cx = length_attribute(element, "cx", default=0.0)
-  let cy = length_attribute(element, "cy", default=0.0)
-  let radius = required_length_attribute(element, "r")
+  let cx = length_attribute_in(element, "cx", Horizontal, viewport, default=0.0)
+  let cy = length_attribute_in(element, "cy", Vertical, viewport, default=0.0)
+  let radius = required_length_attribute_in(element, "r", Diagonal, viewport)
   @object.Object::path(
     ellipse_path(cx, cy, radius, radius),
     style=style.to_shape_style(),
@@ -131,11 +449,12 @@ fn lower_circle(
 fn lower_ellipse(
   element : @xml.XMLElement,
   style : SvgStyle,
+  viewport : SvgViewport,
 ) -> @object.Object raise SvgError {
-  let cx = length_attribute(element, "cx", default=0.0)
-  let cy = length_attribute(element, "cy", default=0.0)
-  let rx = required_length_attribute(element, "rx")
-  let ry = required_length_attribute(element, "ry")
+  let cx = length_attribute_in(element, "cx", Horizontal, viewport, default=0.0)
+  let cy = length_attribute_in(element, "cy", Vertical, viewport, default=0.0)
+  let rx = required_length_attribute_in(element, "rx", Horizontal, viewport)
+  let ry = required_length_attribute_in(element, "ry", Vertical, viewport)
   @object.Object::path(
     ellipse_path(cx, cy, rx, ry),
     style=style.to_shape_style(),
@@ -246,7 +565,7 @@ fn parse_transform_list(value : String) -> @object.Transform raise SvgError {
     }
     scanner.expect_char('(', value)
     let args = read_transform_args(scanner, value)
-    transform = transform.then(transform_command(name, args, value))
+    transform = transform_command(name, args, value).then(transform)
   }
   transform
 }
@@ -437,26 +756,6 @@ fn required_attribute(
 }
 
 ///|
-fn required_length_attribute(
-  element : @xml.XMLElement,
-  name : String,
-) -> Double raise SvgError {
-  parse_number_prefix(required_attribute(element, name), name)
-}
-
-///|
-fn length_attribute(
-  element : @xml.XMLElement,
-  name : String,
-  default~ : Double,
-) -> Double raise SvgError {
-  match element.get_attribute(name) {
-    None => default
-    Some(value) => parse_number_prefix(value, name)
-  }
-}
-
-///|
 fn local_name(name : String) -> String {
   match name.rev_split_once(":") {
     Some((_, tail)) => tail.to_owned()
@@ -470,5 +769,17 @@ fn is_non_rendered_element(name : String) -> Bool {
   name == "title" ||
   name == "desc" ||
   name == "metadata" ||
-  name == "style"
+  name == "style" ||
+  name == "text"
+}
+
+///|
+fn is_shape_element(name : String) -> Bool {
+  name == "path" ||
+  name == "line" ||
+  name == "rect" ||
+  name == "circle" ||
+  name == "ellipse" ||
+  name == "polygon" ||
+  name == "polyline"
 }

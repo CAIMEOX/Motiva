@@ -10,6 +10,7 @@ pub fn parse_path_data(data : String) -> @object.Path3D raise SvgError {
   let mut previous_quadratic_handle : @object.Vec3? = None
   while !scanner.is_done() {
     scanner.skip_comma_wsp()
+    guard !scanner.is_done() else { break }
     match scanner.peek() {
       Some(char) if char.is_ascii_alphabetic() => {
         scanner.advance() |> ignore
