@@ -12,6 +12,23 @@ fn assert_rgba_close(actual : Rgba, expected : Rgba) -> Unit raise {
 }
 
 ///|
+test "rgba exposes common named colors" {
+  assert_rgba_close(Rgba::transparent(), Rgba::new(r=0.0, g=0.0, b=0.0, a=0.0))
+  assert_rgba_close(Rgba::black(), Rgba::rgb(r=0.0, g=0.0, b=0.0))
+  assert_rgba_close(Rgba::white(), Rgba::rgb(r=1.0, g=1.0, b=1.0))
+  assert_rgba_close(Rgba::red(), Rgba::rgb(r=1.0, g=0.0, b=0.0))
+  assert_rgba_close(
+    Rgba::green(),
+    Rgba::rgb(r=0.0, g=0.5019607843137255, b=0.0),
+  )
+  assert_rgba_close(Rgba::lime(), Rgba::rgb(r=0.0, g=1.0, b=0.0))
+  assert_rgba_close(Rgba::blue(), Rgba::rgb(r=0.0, g=0.0, b=1.0))
+  assert_rgba_close(Rgba::yellow(), Rgba::rgb(r=1.0, g=1.0, b=0.0))
+  assert_rgba_close(Rgba::cyan(), Rgba::rgb(r=0.0, g=1.0, b=1.0))
+  assert_rgba_close(Rgba::magenta(), Rgba::rgb(r=1.0, g=0.0, b=1.0))
+}
+
+///|
 test "shape style default follows manim vmobject stroke defaults" {
   let style = ShapeStyle::default()
   guard style.stroke is Some(stroke) else {

@@ -254,10 +254,17 @@ pub(all) struct Rgba {
   a : Double
 }
 pub fn Rgba::black() -> Self
+pub fn Rgba::blue() -> Self
+pub fn Rgba::cyan() -> Self
+pub fn Rgba::green() -> Self
+pub fn Rgba::lime() -> Self
+pub fn Rgba::magenta() -> Self
 pub fn Rgba::new(r~ : Double, g~ : Double, b~ : Double, a~ : Double) -> Self
 pub fn Rgba::red() -> Self
 pub fn Rgba::rgb(r~ : Double, g~ : Double, b~ : Double) -> Self
+pub fn Rgba::transparent() -> Self
 pub fn Rgba::white() -> Self
+pub fn Rgba::yellow() -> Self
 
 pub(all) struct ShapeStyle {
   fill : Rgba?

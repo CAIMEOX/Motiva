@@ -306,9 +306,9 @@ test "object op scale keeps object center by default" {
 test "object op style mutations interpolate through animation builder" {
   let scene = Scene::new()
   let start_style = @object.ShapeStyle::new(
-    fill=@object.Rgba::rgb(r=1.0, g=0.0, b=0.0),
+    fill=@object.Rgba::red(),
     fill_opacity=0.2,
-    stroke=@object.Rgba::rgb(r=0.0, g=0.0, b=1.0),
+    stroke=@object.Rgba::blue(),
     stroke_opacity=0.4,
     stroke_width=2.0,
   )
@@ -319,12 +319,8 @@ test "object op style mutations interpolate through animation builder" {
     scene,
     square
     .animate(run_time=2.0)
-    .set_fill(color=@object.Rgba::rgb(r=0.0, g=1.0, b=0.0), opacity=0.8)
-    .set_stroke(
-      color=@object.Rgba::rgb(r=1.0, g=1.0, b=1.0),
-      width=6.0,
-      opacity=1.0,
-    )
+    .set_fill(color=@object.Rgba::lime(), opacity=0.8)
+    .set_stroke(color=@object.Rgba::white(), width=6.0, opacity=1.0)
     .to_animation(),
   )
   guard patch_put_object(active.sample(0.5), square) is Some(sampled) else {

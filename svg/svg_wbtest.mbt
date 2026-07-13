@@ -21,6 +21,18 @@ fn assert_bounds(
 }
 
 ///|
+fn assert_paint_close(
+  actual : @object.Rgba?,
+  expected : @object.Rgba,
+) -> Unit raise {
+  guard actual is Some(color) else { fail("paint should be present") }
+  assert_close(color.r, expected.r)
+  assert_close(color.g, expected.g)
+  assert_close(color.b, expected.b)
+  assert_close(color.a, expected.a)
+}
+
+///|
 fn parse_result(source : String) -> Result[@object.Object, SvgError] {
   try parse_string(source, center=false) catch {
     error => Err(error)
@@ -64,6 +76,17 @@ test "rect lowers to a styled path and root y flip" {
   assert_close(stroke.b, 0.0)
   assert_close(style.stroke_width, 2.0)
   assert_bounds(object, min_x=1.0, min_y=-6.0, max_x=4.0, max_y=-2.0)
+}
+
+///|
+test "paint parser uses object named colors" {
+  assert_true(parse_paint("none") is None)
+  assert_paint_close(parse_paint("transparent"), @object.Rgba::transparent())
+  assert_paint_close(parse_paint("green"), @object.Rgba::green())
+  assert_paint_close(parse_paint("blue"), @object.Rgba::blue())
+  assert_paint_close(parse_paint("yellow"), @object.Rgba::yellow())
+  assert_paint_close(parse_paint("cyan"), @object.Rgba::cyan())
+  assert_paint_close(parse_paint("magenta"), @object.Rgba::magenta())
 }
 
 ///|

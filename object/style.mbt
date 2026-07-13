@@ -17,6 +17,11 @@ pub fn Rgba::rgb(r~ : Double, g~ : Double, b~ : Double) -> Rgba {
 }
 
 ///|
+pub fn Rgba::transparent() -> Rgba {
+  Rgba::new(r=0.0, g=0.0, b=0.0, a=0.0)
+}
+
+///|
 pub fn Rgba::white() -> Rgba {
   Rgba::rgb(r=1.0, g=1.0, b=1.0)
 }
@@ -29,6 +34,38 @@ pub fn Rgba::black() -> Rgba {
 ///|
 pub fn Rgba::red() -> Rgba {
   Rgba::rgb(r=1.0, g=0.0, b=0.0)
+}
+
+///|
+/// SVG/CSS green, `#008000`.
+pub fn Rgba::green() -> Rgba {
+  Rgba::rgb(r=0.0, g=0.5019607843137255, b=0.0)
+}
+
+///|
+/// Bright RGB green, named `lime` in SVG/CSS.
+pub fn Rgba::lime() -> Rgba {
+  Rgba::rgb(r=0.0, g=1.0, b=0.0)
+}
+
+///|
+pub fn Rgba::blue() -> Rgba {
+  Rgba::rgb(r=0.0, g=0.0, b=1.0)
+}
+
+///|
+pub fn Rgba::yellow() -> Rgba {
+  Rgba::rgb(r=1.0, g=1.0, b=0.0)
+}
+
+///|
+pub fn Rgba::cyan() -> Rgba {
+  Rgba::rgb(r=0.0, g=1.0, b=1.0)
+}
+
+///|
+pub fn Rgba::magenta() -> Rgba {
+  Rgba::rgb(r=1.0, g=0.0, b=1.0)
 }
 
 ///|

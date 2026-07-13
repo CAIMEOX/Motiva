@@ -125,15 +125,15 @@ fn parse_paint(value : String) -> @object.Rgba? raise SvgError {
   let normalized = value.trim().to_lower().to_owned()
   match normalized {
     "none" => None
-    "transparent" => Some(@object.Rgba::new(r=0.0, g=0.0, b=0.0, a=0.0))
+    "transparent" => Some(@object.Rgba::transparent())
     "black" => Some(@object.Rgba::black())
     "white" => Some(@object.Rgba::white())
     "red" => Some(@object.Rgba::red())
-    "green" => Some(@object.Rgba::rgb(r=0.0, g=0.5019607843137255, b=0.0))
-    "blue" => Some(@object.Rgba::rgb(r=0.0, g=0.0, b=1.0))
-    "yellow" => Some(@object.Rgba::rgb(r=1.0, g=1.0, b=0.0))
-    "cyan" => Some(@object.Rgba::rgb(r=0.0, g=1.0, b=1.0))
-    "magenta" => Some(@object.Rgba::rgb(r=1.0, g=0.0, b=1.0))
+    "green" => Some(@object.Rgba::green())
+    "blue" => Some(@object.Rgba::blue())
+    "yellow" => Some(@object.Rgba::yellow())
+    "cyan" => Some(@object.Rgba::cyan())
+    "magenta" => Some(@object.Rgba::magenta())
     _ =>
       if normalized.has_prefix("#") {
         Some(parse_hex_color(normalized))
