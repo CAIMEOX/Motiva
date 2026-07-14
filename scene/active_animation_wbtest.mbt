@@ -527,6 +527,50 @@ test "draw border then fill draws outline before restoring fill" {
 }
 
 ///|
+fn square_path_family(size : Int) -> @object.Object {
+  let children : Array[@object.Object] = []
+  for _ in 0..<size {
+    children.push(@object.into_object(@object.Square::new(side_length=1.0)))
+  }
+  @object.Object::group(children)
+}
+
+///|
+test "write derives Manim timing defaults from path family size" {
+  let scene = Scene::new()
+  let short = scene.object(square_path_family(14))
+  let long = scene.object(square_path_family(40))
+  let short_active = ActiveAnimation::compile(scene, Animation::write(short))
+  let long_animation = Animation::write(long)
+  let long_active = ActiveAnimation::compile(scene, long_animation)
+  assert_close(short_active.run_time(), 1.0)
+  assert_close(long_active.run_time(), 2.0)
+  assert_close(long_active.timing.lag_ratio, 0.1)
+  assert_true(long_active.timing.rate_func is Linear)
+}
+
+///|
+test "write staggers draw border then fill across path family members" {
+  let scene = Scene::new()
+  let family = scene.object(square_path_family(2))
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::write(family, run_time=1.0, lag_ratio=1.0),
+  )
+  guard patch_put_object(active.sample_at_time(0.125), family) is Some(sampled) else {
+    fail("write should put the sampled object family")
+  }
+  guard sampled.node is Group([first, second]) else {
+    fail("write should preserve object family topology")
+  }
+  guard (first.node, second.node) is (Path(first_path, _), Path(second_path, _)) else {
+    fail("write should preserve path family members")
+  }
+  assert_eq(first_path.eval().curve_count(), 2)
+  assert_eq(second_path.eval().curve_count(), 0)
+}
+
+///|
 test "wait active animation has no affected ids and empty patches" {
   let scene = Scene::new()
   let active = ActiveAnimation::compile(scene, Animation::wait(1.0))

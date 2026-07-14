@@ -34,6 +34,7 @@ pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, 
 pub fn[T : IntoAnimation] Animation::group(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn[T : IntoAnimation] Animation::lagged_start(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
+pub fn[T : IntoAnimation] Animation::replacement(source~ : ObjectId, target~ : ObjectId, Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::scale(ObjectId, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
@@ -41,6 +42,7 @@ pub fn Animation::wait(Double) -> Self
 pub fn Animation::with_lag_ratio(Self, Double) -> Self
 pub fn Animation::with_rate_func(Self, RateFunc) -> Self
 pub fn Animation::with_run_time(Self, Double) -> Self
+pub fn Animation::write(ObjectId, run_time? : Double, lag_ratio? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub impl IntoAnimation for Animation
 
 pub(all) struct AnimationBuilder {
@@ -76,6 +78,7 @@ pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
+  Write(ObjectId, Double?)
   Scale(ObjectId, ScaleSpec)
   Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId, FadeSpec)
@@ -83,6 +86,7 @@ pub(all) enum AnimationKind {
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
+  Replacement(AnimationGroup, source~ : ObjectId, target~ : ObjectId)
 }
 
 pub(all) struct FadeSpec {
@@ -268,7 +272,7 @@ pub fn Timing::with_run_time(Self, Double) -> Self
 // Type aliases
 
 // Traits
-pub trait IntoAnimation {
+pub(open) trait IntoAnimation {
   fn to_animation(Self) -> Animation
 }
 

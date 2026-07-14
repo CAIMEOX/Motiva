@@ -2,6 +2,7 @@
 priv enum FrameOp {
   Put(ObjectId, @object.Object)
   EnsureVisible(ObjectId)
+  ShowSubtree(ObjectId)
   Hide(ObjectId)
 }
 
@@ -31,6 +32,11 @@ fn FramePatch::ensure_visible(id : ObjectId) -> FramePatch {
 }
 
 ///|
+fn FramePatch::show_subtree(id : ObjectId) -> FramePatch {
+  FramePatch::from_ops([ShowSubtree(id)])
+}
+
+///|
 fn FramePatch::hide(id : ObjectId) -> FramePatch {
   FramePatch::from_ops([Hide(id)])
 }
@@ -54,6 +60,7 @@ fn Scene::apply_frame_patch(
     match op {
       Put(id, object) => self.replace_object(id, object)
       EnsureVisible(id) => self.ensure_visible(id)
+      ShowSubtree(id) => self.show(id)
       Hide(id) => self.remove(id)
     }
   })

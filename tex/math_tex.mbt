@@ -40,9 +40,52 @@ pub async fn TexEngine::math_tex(
 pub fn MathTex::parts(self : MathTex) -> Array[String] {
   self.part_index
   .iter()
-  .filter(part => part.main)
+  .filter(part => part.kind is Main)
   .map(part => part.source)
   .to_array()
+}
+
+///|
+pub fn MathTex::fragments(
+  self : MathTex,
+  kind? : TexFragmentKind,
+) -> Array[TexFragment] {
+  let fragments : Array[TexFragment] = []
+  let mut fragment_index = 0
+  for part in self.part_index {
+    for path in self.svg.group_paths(part.id) {
+      let fragment = {
+        tex_string: part.source,
+        kind: part.kind,
+        path,
+        index: fragment_index,
+      }
+      if kind.map_or(true, expected => expected == fragment.kind) {
+        fragments.push(fragment)
+      }
+      fragment_index = fragment_index + 1
+    }
+  }
+  fragments
+}
+
+///|
+pub fn MathTex::fragment(self : MathTex, index : Int) -> TexFragment? {
+  for fragment in self.fragments() {
+    if fragment.index == index {
+      return Some(fragment)
+    }
+  }
+  None
+}
+
+///|
+pub fn MathTex::fragments_by_tex(
+  self : MathTex,
+  tex : String,
+  kind? : TexFragmentKind,
+) -> Array[TexFragment] {
+  self.fragments(kind?).filter(fragment => fragment.tex_string == tex)
 }
 
 ///|
@@ -50,11 +93,7 @@ pub fn MathTex::part_paths(
   self : MathTex,
   tex : String,
 ) -> Array[@object.FamilyPath] {
-  self.part_index
-  .iter()
-  .filter(part => part.source == tex)
-  .flat_map(part => self.svg.group_paths(part.id).iter())
-  .to_array()
+  self.fragments_by_tex(tex).map(fragment => fragment.path)
 }
 
 ///|
@@ -92,7 +131,7 @@ pub fn MathTex::set_opacity_by_tex(
 ///|
 pub fn MathTex::object(self : MathTex) -> @object.Object {
   let mut object = recolor_default_tex(self.svg.object(), self.color)
-  let scale = self.font_size / 960.0
+  let scale = math_tex_font_scale(self.font_size)
   object = {
     ..object,
     transform: object.transform.then(
@@ -109,6 +148,13 @@ pub fn MathTex::object(self : MathTex) -> @object.Object {
     }
   }
   object
+}
+
+///|
+fn math_tex_font_scale(font_size : Double) -> Double {
+  let scene_units_per_font_point = 1.0 / 960.0
+  let svg_units_per_point = 96.0 / 72.0
+  font_size * scene_units_per_font_point / svg_units_per_point
 }
 
 ///|

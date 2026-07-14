@@ -13,6 +13,12 @@ priv struct ActiveChild {
 }
 
 ///|
+priv struct ReplacementFinish {
+  source : ObjectId
+  target : ObjectId
+}
+
+///|
 priv enum ActiveAnimationKind {
   ActiveWait
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
@@ -22,9 +28,14 @@ priv enum ActiveAnimationKind {
   ActiveDrawBorderThenFill(
     ObjectId,
     source~ : @object.Object,
-    outline~ : @object.Object
+    outline~ : @object.Object,
+    family_size~ : Int
   )
-  ActiveGroup(Array[ActiveChild], natural_run_time~ : Double)
+  ActiveGroup(
+    Array[ActiveChild],
+    natural_run_time~ : Double,
+    replacement~ : ReplacementFinish?
+  )
 }
 
 ///|
@@ -68,6 +79,20 @@ fn ActiveAnimation::compile(
         source=scene.require_materialized_object(id),
         timing=animation.timing,
       )
+    Write(id, lag_ratio) => {
+      let source = scene.require_materialized_object(id)
+      let family_size = create_family_size(source)
+      let resolved_lag_ratio = match lag_ratio {
+        Some(value) => value
+        None => write_default_lag_ratio(family_size)
+      }
+      ActiveAnimation::draw_border_then_fill(
+        id,
+        source~,
+        timing=animation.timing.with_lag_ratio(resolved_lag_ratio),
+        natural_run_time=write_default_run_time(family_size),
+      )
+    }
     Scale(id, spec) =>
       ActiveAnimation::scale(
         id,
@@ -109,6 +134,14 @@ fn ActiveAnimation::compile(
     }
     Group(group) =>
       ActiveAnimation::group(scene, group.animations, timing=animation.timing)
+    Replacement(group, source~, target~) => {
+      ignore(scene.require_object(source))
+      ignore(scene.require_object(target))
+      ActiveAnimation::group(scene, group.animations, timing=animation.timing, replacement={
+        source,
+        target,
+      })
+    }
   }
 }
 
@@ -259,15 +292,18 @@ fn ActiveAnimation::draw_border_then_fill(
   id : ObjectId,
   source~ : @object.Object,
   timing~ : Timing,
+  natural_run_time? : Double = 2.0,
 ) -> ActiveAnimation {
+  let family_size = create_family_size(source)
   {
     kind: ActiveDrawBorderThenFill(
       id,
       source~,
       outline=make_outline_object(source),
+      family_size~,
     ),
     timing,
-    run_time: timing.resolve_run_time(1.0),
+    run_time: timing.resolve_run_time(natural_run_time),
     lifecycle: AnimationLifecycle::new(
       introducer=true,
       remover=false,
@@ -281,6 +317,7 @@ fn ActiveAnimation::group(
   scene : Scene,
   animations : Array[Animation],
   timing~ : Timing,
+  replacement? : ReplacementFinish,
 ) -> ActiveAnimation raise SceneError {
   let children = animations.map(animation => {
     ActiveAnimation::compile(scene, animation)
@@ -295,10 +332,10 @@ fn ActiveAnimation::group(
     }
   })
   {
-    kind: ActiveGroup(scheduled, natural_run_time~),
+    kind: ActiveGroup(scheduled, natural_run_time~, replacement~),
     timing,
     run_time: timing.resolve_run_time(natural_run_time),
-    lifecycle: group_lifecycle(scheduled),
+    lifecycle: group_lifecycle(scheduled, replacement),
   }
 }
 
@@ -340,13 +377,28 @@ fn schedule_group_children(
 }
 
 ///|
-fn group_lifecycle(children : Array[ActiveChild]) -> AnimationLifecycle {
-  children.fold(init=AnimationLifecycle::passive(), (lifecycle, child) => {
+fn group_lifecycle(
+  children : Array[ActiveChild],
+  replacement : ReplacementFinish?,
+) -> AnimationLifecycle {
+  let lifecycle = children.fold(init=AnimationLifecycle::passive(), (
+    lifecycle,
+    child,
+  ) => {
     introducer: lifecycle.introducer || child.animation.lifecycle.introducer,
     remover: lifecycle.remover || child.animation.lifecycle.remover,
     mutates_object: lifecycle.mutates_object ||
     child.animation.lifecycle.mutates_object,
   })
+  match replacement {
+    None => lifecycle
+    Some(_) =>
+      AnimationLifecycle::new(
+        introducer=true,
+        remover=true,
+        mutates_object=true,
+      )
+  }
 }
 
 ///|
@@ -363,11 +415,20 @@ fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
     | ActiveRotate(id, ..)
     | ActiveReveal(id, ..)
     | ActiveDrawBorderThenFill(id, ..) => [id]
-    ActiveGroup(children, ..) =>
-      children
-      .iter()
-      .flat_map(child => child.animation.affected_ids().iter())
-      .to_array()
+    ActiveGroup(children, replacement~, ..) => {
+      let ids = children
+        .iter()
+        .flat_map(child => child.animation.affected_ids().iter())
+        .to_array()
+      match replacement {
+        None => ()
+        Some(finish) => {
+          ids.push(finish.source)
+          ids.push(finish.target)
+        }
+      }
+      ids
+    }
   }
 }
 
@@ -399,9 +460,18 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
         ),
         FramePatch::ensure_visible(id),
       ])
-    ActiveDrawBorderThenFill(id, source~, outline~) =>
+    ActiveDrawBorderThenFill(id, source~, outline~, family_size~) =>
       FramePatch::all([
-        FramePatch::put(id, sample_draw_border_then_fill(source, outline, 0.0)),
+        FramePatch::put(
+          id,
+          sample_draw_border_then_fill(
+            source,
+            outline,
+            0.0,
+            self.timing,
+            family_size,
+          ),
+        ),
         FramePatch::ensure_visible(id),
       ])
     ActiveGroup(children, ..) =>
@@ -444,11 +514,17 @@ fn ActiveAnimation::sample(
           ),
           FramePatch::ensure_visible(id),
         ])
-      ActiveDrawBorderThenFill(id, source~, outline~) =>
+      ActiveDrawBorderThenFill(id, source~, outline~, family_size~) =>
         FramePatch::all([
           FramePatch::put(
             id,
-            sample_draw_border_then_fill(source, outline, alpha),
+            sample_draw_border_then_fill(
+              source,
+              outline,
+              raw_alpha,
+              self.timing,
+              family_size,
+            ),
           ),
           FramePatch::ensure_visible(id),
         ])
@@ -463,7 +539,7 @@ fn ActiveAnimation::sample_at_time(
   elapsed : Double,
 ) -> FramePatch {
   match self.kind {
-    ActiveGroup(children, natural_run_time~) =>
+    ActiveGroup(children, natural_run_time~, ..) =>
       self.sample_group_at_time(children, natural_run_time, elapsed)
     _ => self.sample(self.timing.raw_alpha_at_run_time(elapsed, self.run_time))
   }
@@ -472,8 +548,21 @@ fn ActiveAnimation::sample_at_time(
 ///|
 fn ActiveAnimation::finish_patch(self : ActiveAnimation) -> FramePatch {
   match self.kind {
-    ActiveGroup(children, ..) =>
-      FramePatch::all(children.map(child => child.animation.finish_patch()))
+    ActiveGroup(children, replacement~, ..) => {
+      let finished = FramePatch::all(
+        children.map(child => child.animation.finish_patch()),
+      )
+      match replacement {
+        None => finished
+        Some(finish) =>
+          finished.then(
+            FramePatch::all([
+              FramePatch::hide(finish.source),
+              FramePatch::show_subtree(finish.target),
+            ]),
+          )
+      }
+    }
     _ => {
       let final_sample = self.sample_at_time(self.run_time())
       if self.lifecycle.remover {
@@ -553,7 +642,7 @@ fn sample_create_family_member(
     Empty => (@object.Empty, family_index)
     Path(path, style) => {
       let alpha = timing.family_alpha(raw_alpha, family_index, family_size)
-      (@object.Path(sample_create_path(path, alpha), style), family_index + 1)
+      (Path(sample_create_path(path, alpha), style), family_index + 1)
     }
     Group(children) => {
       let sampled : Array[@object.Object] = []
@@ -565,7 +654,7 @@ fn sample_create_family_member(
         sampled.push(next)
         next_index = after_child
       }
-      (@object.Group(sampled), next_index)
+      (Group(sampled), next_index)
     }
   }
   (
@@ -703,17 +792,84 @@ fn resolve_rotation_about_point(
 fn sample_draw_border_then_fill(
   source : @object.Object,
   outline : @object.Object,
-  alpha : Double,
+  raw_alpha : Double,
+  timing : Timing,
+  family_size : Int,
 ) -> @object.Object {
-  if alpha < 0.5 {
-    sample_create_object(
-      outline,
-      alpha * 2.0,
-      Timing::new(),
-      create_family_size(outline),
-    )
+  sample_draw_border_then_fill_member(
+    source, outline, raw_alpha, timing, family_size, 0,
+  ).0
+}
+
+///|
+fn sample_draw_border_then_fill_member(
+  source : @object.Object,
+  outline : @object.Object,
+  raw_alpha : Double,
+  timing : Timing,
+  family_size : Int,
+  family_index : Int,
+) -> (@object.Object, Int) {
+  match (source.node, outline.node) {
+    (Empty, _) => (source, family_index)
+    (Path(_, _), Path(_, _)) => {
+      let alpha = timing.family_alpha(raw_alpha, family_index, family_size)
+      let sampled = if alpha < 0.5 {
+        sample_create_object(outline, alpha * 2.0, Timing::new(), 1)
+      } else {
+        interpolate_object(outline, source, (alpha - 0.5) * 2.0)
+      }
+      (sampled, family_index + 1)
+    }
+    (Group(source_children), Group(outline_children)) => {
+      let sampled : Array[@object.Object] = []
+      let mut next_index = family_index
+      for index in 0..<source_children.length() {
+        match (source_children.get(index), outline_children.get(index)) {
+          (Some(source_child), Some(outline_child)) => {
+            let (next, after_child) = sample_draw_border_then_fill_member(
+              source_child, outline_child, raw_alpha, timing, family_size, next_index,
+            )
+            sampled.push(next)
+            next_index = after_child
+          }
+          (Some(source_child), None) => {
+            sampled.push(source_child)
+            next_index = next_index + create_family_size(source_child)
+          }
+          _ => ()
+        }
+      }
+      (
+        @object.Object::new(
+          node=Group(sampled),
+          transform=source.transform,
+          z_index=source.z_index,
+        ),
+        next_index,
+      )
+    }
+    _ => (source, family_index + create_family_size(source))
+  }
+}
+
+///|
+fn write_default_run_time(family_size : Int) -> Double {
+  if family_size < 15 {
+    1.0
   } else {
-    interpolate_object(outline, source, (alpha - 0.5) * 2.0)
+    2.0
+  }
+}
+
+///|
+fn write_default_lag_ratio(family_size : Int) -> Double {
+  let denominator = if family_size < 1 { 1.0 } else { family_size.to_double() }
+  let ratio = 4.0 / denominator
+  if ratio < 0.2 {
+    ratio
+  } else {
+    0.2
   }
 }
 

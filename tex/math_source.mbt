@@ -8,7 +8,7 @@ priv struct PreparedMathSource {
 priv struct TexPart {
   source : String
   id : String
-  main : Bool
+  kind : TexFragmentKind
 }
 
 ///|
@@ -92,7 +92,7 @@ fn prepare_math_source(
   for index in 0..<sources.length() {
     let source = sources[index]
     let id = "motiva-main-\{index}"
-    parts.push({ source, id, main: true })
+    parts.push({ source, id, kind: Main })
     let (processed, next_substring_index) = isolate_substrings(
       source, substrings_to_isolate, substring_index, parts,
     )
@@ -130,7 +130,7 @@ fn isolate_substrings(
           rendered.write_string(remaining.unsafe_substring(start=0, end=offset))
         }
         let id = "motiva-sub-\{index}"
-        parts.push({ source: matched, id, main: false })
+        parts.push({ source: matched, id, kind: Isolated })
         rendered.write_string("\\special{dvisvgm:raw <g id='\{id}'>}")
         rendered.write_string(matched)
         rendered.write_string("\\special{dvisvgm:raw </g>}")

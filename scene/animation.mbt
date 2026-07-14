@@ -388,6 +388,7 @@ pub(all) enum AnimationKind {
   Wait
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
+  Write(ObjectId, Double?)
   Scale(ObjectId, ScaleSpec)
   Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId, FadeSpec)
@@ -395,6 +396,7 @@ pub(all) enum AnimationKind {
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
+  Replacement(AnimationGroup, source~ : ObjectId, target~ : ObjectId)
 }
 
 ///|
@@ -436,7 +438,39 @@ pub fn[T : IntoAnimation] Animation::group(
   reverse_rate_function? : Bool = false,
   lag_ratio? : Double = 0.0,
 ) -> Animation {
-  let timing = match run_time {
+  let timing = composition_timing(
+    run_time, rate_func, reverse_rate_function, lag_ratio,
+  )
+  Animation::new(Group(AnimationGroup::new(animations)), timing~)
+}
+
+///|
+pub fn[T : IntoAnimation] Animation::replacement(
+  source~ : ObjectId,
+  target~ : ObjectId,
+  animations : Array[T],
+  run_time? : Double,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+  lag_ratio? : Double = 0.0,
+) -> Animation {
+  let timing = composition_timing(
+    run_time, rate_func, reverse_rate_function, lag_ratio,
+  )
+  Animation::new(
+    Replacement(AnimationGroup::new(animations), source~, target~),
+    timing~,
+  )
+}
+
+///|
+fn composition_timing(
+  run_time : Double?,
+  rate_func : RateFunc,
+  reverse_rate_function : Bool,
+  lag_ratio : Double,
+) -> Timing {
+  match run_time {
     None => Timing::auto(rate_func~, reverse_rate_function~, lag_ratio~)
     Some(seconds) =>
       Timing::new(
@@ -446,7 +480,6 @@ pub fn[T : IntoAnimation] Animation::group(
         lag_ratio~,
       )
   }
-  Animation::new(Group(AnimationGroup::new(animations)), timing~)
 }
 
 ///|
@@ -496,6 +529,22 @@ pub fn Animation::draw_border_then_fill(
     DrawBorderThenFill(id),
     timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
   )
+}
+
+///|
+pub fn Animation::write(
+  id : ObjectId,
+  run_time? : Double,
+  lag_ratio? : Double,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  let timing = match run_time {
+    None => Timing::auto(rate_func~, reverse_rate_function~)
+    Some(seconds) =>
+      Timing::new(run_time=seconds, rate_func~, reverse_rate_function~)
+  }
+  Animation::new(Write(id, lag_ratio), timing~)
 }
 
 ///|
@@ -622,7 +671,7 @@ pub fn Animation::with_lag_ratio(
 }
 
 ///|
-pub trait IntoAnimation {
+pub(open) trait IntoAnimation {
   fn to_animation(Self) -> Animation
 }
 

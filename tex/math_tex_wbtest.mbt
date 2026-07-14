@@ -126,6 +126,168 @@ async test "TexEngine compiles queryable MathTex through dvisvgm" {
 }
 
 ///|
+async test "MathTex font size compensates for SVG point units" {
+  let latex = "/Library/TeX/texbin/latex"
+  let dvisvgm = "/Library/TeX/texbin/dvisvgm"
+  if !@fs.exists(latex) || !@fs.exists(dvisvgm) {
+    return
+  }
+  @async.with_task_group() <| root => {
+    let cache_dir = "_build/tex_unit_scale_test"
+    if @fs.exists(cache_dir) {
+      @fs.rmdir(cache_dir, recursive=true)
+    }
+    root.add_defer(() => @fs.rmdir(cache_dir, recursive=true))
+    let formula = TexEngine::new(latex~, dvisvgm~, cache_dir~).math_tex(
+      ["x"],
+      font_size=48.0,
+    )
+    guard formula.svg_object().object().bounds() is Some(svg_bounds) &&
+      formula.object().bounds() is Some(math_bounds) else {
+      fail("compiled MathTex should have SVG and scene bounds")
+    }
+    assert_tex_close(math_bounds.width() / svg_bounds.width(), 48.0 / 1280.0)
+  }
+}
+
+///|
+async test "MathTex fragments distinguish main and isolated matches" {
+  let latex = "/Library/TeX/texbin/latex"
+  let dvisvgm = "/Library/TeX/texbin/dvisvgm"
+  if !@fs.exists(latex) || !@fs.exists(dvisvgm) {
+    return
+  }
+  @async.with_task_group() <| root => {
+    let cache_dir = "_build/tex_fragment_test"
+    if @fs.exists(cache_dir) {
+      @fs.rmdir(cache_dir, recursive=true)
+    }
+    root.add_defer(() => @fs.rmdir(cache_dir, recursive=true))
+    let formula = TexEngine::new(latex~, dvisvgm~, cache_dir~).math_tex(
+      ["{{x}} + {{y}}"],
+      substrings_to_isolate=["x"],
+    )
+    let main_x = formula.fragments_by_tex("x", kind=Main)
+    let isolated_x = formula.fragments_by_tex("x", kind=Isolated)
+    guard (main_x, isolated_x) is ([main], [isolated]) else {
+      fail("x should have one main and one isolated fragment")
+    }
+    assert_eq(main.tex_string, "x")
+    assert_true(main.kind is Main)
+    assert_true(isolated.kind is Isolated)
+    assert_true(main.path != isolated.path)
+    assert_eq(formula.fragments(kind=Main).length(), 3)
+    assert_true(isolated.index > main.index)
+    assert_true(
+      formula.fragment(main.index).map_or(false, found => found == main),
+    )
+    assert_true(
+      formula.fragment(isolated.index).map_or(false, found => found == isolated),
+    )
+  }
+}
+
+///|
+async test "TransformMatchingTex matches main fragments and replaces the formula" {
+  let latex = "/Library/TeX/texbin/latex"
+  let dvisvgm = "/Library/TeX/texbin/dvisvgm"
+  if !@fs.exists(latex) || !@fs.exists(dvisvgm) {
+    return
+  }
+  @async.with_task_group() <| root => {
+    let cache_dir = "_build/transform_matching_tex_test"
+    if @fs.exists(cache_dir) {
+      @fs.rmdir(cache_dir, recursive=true)
+    }
+    root.add_defer(() => @fs.rmdir(cache_dir, recursive=true))
+    let engine = TexEngine::new(latex~, dvisvgm~, cache_dir~)
+    let source = engine.math_tex(["A", "+", "B"])
+    let target = engine.math_tex(["B", "-", "A"])
+    let scene = @scene.Scene::new(
+      config=@scene.SceneConfig::new(frame_rate=20.0),
+    )
+    let source_root = scene.add(source.copy())
+    guard source.fragments_by_tex("A", kind=Main) is [source_a] &&
+      target.fragments_by_tex("A", kind=Main) is [target_a] else {
+      fail("both formulas should expose one main A fragment")
+    }
+    let source_a_id = scene.resolve_family_path(source_root, source_a.path)
+    guard scene.get(source_a_id) is Some(source_a_object) else {
+      fail("source A should exist before matching")
+    }
+    let transition = TransformMatchingTex::new(
+      scene,
+      source_root,
+      source,
+      target,
+      run_time=1.0,
+    )
+    let target_root = transition.target_id()
+    let target_a_id = scene.resolve_family_path(target_root, target_a.path)
+    guard scene.get(target_a_id) is Some(target_a_object) else {
+      fail("target A should be allocated before matching")
+    }
+    assert_true(scene.state(target_root) is Some(Allocated))
+    let plan = scene.compile_play_plan(
+      [transition],
+      config=@scene.PlayConfig::image_sequence(),
+    )
+    plan.begin(scene)
+    plan.apply_frame(scene, {
+      frame_index: 10,
+      play_time: 0.5,
+      absolute_time: 0.5,
+      dt: 0.5,
+    })
+    guard scene.get(source_a_id) is Some(sampled_a) else {
+      fail("matched source A should remain present during interpolation")
+    }
+    assert_tex_close(
+      sampled_a.center().x,
+      (source_a_object.center().x + target_a_object.center().x) / 2.0,
+    )
+    plan.finish(scene)
+    assert_true(!scene.is_visible(source_root))
+    assert_true(scene.is_visible(target_root))
+  }
+}
+
+///|
+async test "TransformMatchingTex key map accepts fragments with different topology" {
+  let latex = "/Library/TeX/texbin/latex"
+  let dvisvgm = "/Library/TeX/texbin/dvisvgm"
+  if !@fs.exists(latex) || !@fs.exists(dvisvgm) {
+    return
+  }
+  @async.with_task_group() <| root => {
+    let cache_dir = "_build/transform_matching_tex_key_map_test"
+    if @fs.exists(cache_dir) {
+      @fs.rmdir(cache_dir, recursive=true)
+    }
+    root.add_defer(() => @fs.rmdir(cache_dir, recursive=true))
+    let engine = TexEngine::new(latex~, dvisvgm~, cache_dir~)
+    let source = engine.math_tex(["x"])
+    let target = engine.math_tex(["\\frac{1}{y}"])
+    let scene = @scene.Scene::new()
+    let source_root = scene.add(source.copy())
+    let key_map : Map[String, String] = { "x": "\\frac{1}{y}" }
+    let transition = TransformMatchingTex::new(
+      scene,
+      source_root,
+      source,
+      target,
+      key_map~,
+    )
+    let target_root = transition.target_id()
+    let plan = scene.compile_play_plan([transition])
+    plan.begin(scene)
+    plan.finish(scene)
+    assert_true(!scene.is_visible(source_root))
+    assert_true(scene.is_visible(target_root))
+  }
+}
+
+///|
 async test "TexEngine reports compiler failures as TexError" {
   let cache_dir = "_build/tex_failure_test"
   if @fs.exists(cache_dir) {

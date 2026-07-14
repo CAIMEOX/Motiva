@@ -60,3 +60,54 @@ test "lagged start uses manim default lag ratio" {
   )
   assert_close(active.run_time(), 1.05)
 }
+
+///|
+test "replacement group swaps source and target families after child animations" {
+  let scene = Scene::new()
+  let source = scene.add(@object.Square::new(side_length=2.0))
+  let target = scene.object(@object.Circle::new(radius=1.0))
+  let animation = Animation::replacement(
+    source~,
+    target~,
+    [Animation::transform(source, @object.Circle::new(radius=1.0))],
+    run_time=1.0,
+  )
+  let plan = scene.compile_play_plan(
+    [animation],
+    config=PlayConfig::image_sequence(),
+  )
+  plan.begin(scene)
+  assert_true(scene.is_visible(source))
+  assert_true(!scene.is_visible(target))
+  plan.finish(scene)
+  assert_true(!scene.is_visible(source))
+  assert_true(scene.is_visible(target))
+}
+
+///|
+test "replacement finish reveals target siblings after one target child starts" {
+  let scene = Scene::new()
+  let source = scene.add(@object.Square::new(side_length=2.0))
+  let target = scene.object(
+    @object.Object::group([
+      @object.into_object(@object.Circle::new(radius=1.0)),
+      @object.into_object(@object.Square::new(side_length=1.0)),
+    ]),
+  )
+  guard scene.family(target) is [_, first, second] else {
+    fail("target should contain two path children")
+  }
+  let plan = scene.compile_play_plan([
+    Animation::replacement(
+      source~,
+      target~,
+      [Animation::fade_in(second, run_time=1.0)],
+      run_time=1.0,
+    ),
+  ])
+  plan.begin(scene)
+  assert_true(scene.is_visible(target))
+  assert_true(!scene.is_visible(first))
+  plan.finish(scene)
+  assert_true(scene.family(target).all(id => scene.is_visible(id)))
+}
