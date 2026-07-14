@@ -34,6 +34,21 @@ impl Default for SvgStyle with fn default() -> SvgStyle {
 }
 
 ///|
+fn SvgStyle::from_shape_style(style : @object.ShapeStyle) -> SvgStyle {
+  {
+    color: @object.Rgba::black(),
+    fill: style.fill.map_or(NoPaint, color => Solid(color)),
+    fill_opacity: style.fill_opacity,
+    stroke: style.stroke.map_or(NoPaint, color => Solid(color)),
+    stroke_opacity: style.stroke_opacity,
+    stroke_width: style.stroke_width,
+    opacity: 1.0,
+    displayed: true,
+    visible: true,
+  }
+}
+
+///|
 fn SvgStyle::to_shape_style(self : SvgStyle) -> @object.ShapeStyle {
   let fill = self.fill.resolve(self.color)
   let stroke = self.stroke.resolve(self.color)

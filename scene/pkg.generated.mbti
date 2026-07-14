@@ -11,6 +11,7 @@ pub fn[T : IntoAnimation] into_animation(T) -> Animation
 // Errors
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  UnknownFamilyPath(ObjectId, @object.FamilyPath)
   NonInvertibleFamilyTransform(ObjectId)
   FamilyTopologyMismatch(ObjectId)
   ConflictingFamilyAnimations(ObjectId, ObjectId)
@@ -26,7 +27,7 @@ pub(all) struct Animation {
   timing : Timing
 }
 pub fn Animation::apply_ops(ObjectId, Array[ObjectOp], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
-pub fn Animation::create(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::create(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::fade_in(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
 pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
@@ -225,6 +226,7 @@ pub fn Scene::play_immediate(Self, Array[Animation], config? : PlayConfig) -> Un
 pub fn Scene::remove(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::remove_foreground(Self, ObjectId) -> Unit raise SceneError
 pub fn[T : @object.IntoObject] Scene::replace(Self, ObjectId, T) -> Unit raise SceneError
+pub fn Scene::resolve_family_path(Self, ObjectId, @object.FamilyPath) -> ObjectId raise SceneError
 pub fn Scene::set_play_writer(Self, PlayWriter?) -> Unit
 pub fn Scene::show(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::show_foreground(Self, ObjectId) -> Unit raise SceneError

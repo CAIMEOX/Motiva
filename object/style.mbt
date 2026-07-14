@@ -4,7 +4,7 @@ pub(all) struct Rgba {
   g : Double
   b : Double
   a : Double
-}
+} derive(Eq, Hash)
 
 ///|
 pub fn Rgba::new(r~ : Double, g~ : Double, b~ : Double, a~ : Double) -> Rgba {
@@ -75,7 +75,7 @@ pub(all) struct ShapeStyle {
   stroke : Rgba?
   stroke_opacity : Double
   stroke_width : Double
-}
+} derive(Eq, Hash)
 
 ///|
 pub fn ShapeStyle::new(

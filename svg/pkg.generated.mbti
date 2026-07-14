@@ -3,12 +3,13 @@ package "CAIMEOX/Motiva/svg"
 
 import {
   "CAIMEOX/Motiva/object",
+  "moonbitlang/core/debug",
 }
 
 // Values
 pub fn parse_path_data(String) -> @object.Path3D raise SvgError
 
-pub fn parse_string(String, center? : Bool, height? : Double, width? : Double) -> @object.Object raise SvgError
+pub fn parse_string(String, center? : Bool, height? : Double, width? : Double, default_style? : @object.ShapeStyle, override_style? : @object.ShapeStyle) -> @object.Object raise SvgError
 
 // Errors
 pub(all) suberror SvgError {
@@ -28,12 +29,18 @@ pub(all) suberror SvgError {
 }
 
 // Types and methods
+pub(all) enum SvgDiagnostic {
+  SkippedElement(String)
+} derive(Eq, @debug.Debug)
+
 pub struct SvgObject {
   // private fields
 }
 pub fn SvgObject::copy(Self) -> Self
+pub fn SvgObject::diagnostics(Self) -> Array[SvgDiagnostic]
+pub fn SvgObject::group_paths(Self, String) -> Array[@object.FamilyPath]
 pub fn SvgObject::object(Self) -> @object.Object
-pub fn SvgObject::parse_string(String, center? : Bool, height? : Double, width? : Double) -> Self raise SvgError
+pub fn SvgObject::parse_string(String, center? : Bool, height? : Double, width? : Double, default_style? : @object.ShapeStyle, override_style? : @object.ShapeStyle) -> Self raise SvgError
 pub impl @object.IntoObject for SvgObject
 
 // Type aliases

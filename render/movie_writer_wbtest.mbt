@@ -11,6 +11,8 @@ test "movie writer wraps image sequence settings and mp4 output" {
   assert_eq(writer.image_sequence.output_dir, "output/frames")
   assert_eq(writer.image_sequence.frame_prefix, "circle_to_square")
   assert_eq(writer.image_sequence.frame_padding, 4)
+  assert_true(writer.image_sequence.play_config.include_start_frame)
+  assert_true(!writer.image_sequence.play_config.include_end_frame)
   assert_true(writer.frame_rate.value().is_close(60.0))
   assert_eq(writer.movie_output.path, "output/circle_to_square.mp4")
   assert_true(writer.movie_output.format is Mp4)

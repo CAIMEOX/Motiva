@@ -430,6 +430,58 @@ test "create samples a path prefix over time" {
 }
 
 ///|
+test "create staggers path family members by default" {
+  let scene = Scene::new()
+  let family = scene.object(
+    @object.Object::group([
+      @object.into_object(@object.Square::new(side_length=2.0)),
+      @object.into_object(@object.Square::new(side_length=2.0)),
+    ]),
+  )
+  let animation = Animation::create(family, run_time=1.0)
+  assert_true(animation.timing.rate_func is Smooth)
+  assert_close(animation.timing.lag_ratio, 1.0)
+  let active = ActiveAnimation::compile(scene, animation)
+  guard patch_put_object(active.sample_at_time(0.25), family) is Some(sampled) else {
+    fail("create should put the sampled object family")
+  }
+  guard sampled.node is Group([first, second]) else {
+    fail("create should preserve object family topology")
+  }
+  guard (first.node, second.node) is (Path(first_path, _), Path(second_path, _)) else {
+    fail("create should preserve path family members")
+  }
+  assert_eq(first_path.eval().curve_count(), 2)
+  assert_eq(second_path.eval().curve_count(), 0)
+}
+
+///|
+test "create lag ratio zero reveals path family members together" {
+  let scene = Scene::new()
+  let family = scene.object(
+    @object.Object::group([
+      @object.into_object(@object.Square::new(side_length=2.0)),
+      @object.into_object(@object.Square::new(side_length=2.0)),
+    ]),
+  )
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::create(family, run_time=1.0, lag_ratio=0.0),
+  )
+  guard patch_put_object(active.sample_at_time(0.25), family) is Some(sampled) else {
+    fail("create should put the sampled object family")
+  }
+  guard sampled.node is Group([first, second]) else {
+    fail("create should preserve object family topology")
+  }
+  guard (first.node, second.node) is (Path(first_path, _), Path(second_path, _)) else {
+    fail("create should preserve path family members")
+  }
+  assert_eq(first_path.eval().curve_count(), 1)
+  assert_eq(second_path.eval().curve_count(), 1)
+}
+
+///|
 test "draw border then fill draws outline before restoring fill" {
   let scene = Scene::new()
   let style = @object.ShapeStyle::new(

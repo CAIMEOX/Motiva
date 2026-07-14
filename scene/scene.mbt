@@ -45,6 +45,7 @@ pub(all) struct SceneObject {
 ///|
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  UnknownFamilyPath(ObjectId, @object.FamilyPath)
   NonInvertibleFamilyTransform(ObjectId)
   FamilyTopologyMismatch(ObjectId)
   ConflictingFamilyAnimations(ObjectId, ObjectId)

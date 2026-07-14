@@ -86,3 +86,31 @@ async test "SvgLoader parses Manim graphical-unit fixtures" {
     }
   }
 }
+
+///|
+async test "SvgLoader accepts the complete Manim SVG fixture corpus" {
+  let loader = SvgLoader::new()
+  let fixtures = [
+    "A.svg", "aabbb.svg", "arcs01.svg", "arcs02.svg", "cubic_and_lineto.svg", "cubic_demo.svg",
+    "curve.svg", "dash.svg", "desmos-graph_1.svg", "half_ellipse.svg", "heart.svg",
+    "inheritance_test.svg", "line.svg", "manim-logo-sidebar.svg", "matrix.svg", "multi_part_path.svg",
+    "multiple_transforms.svg", "path_multiple_moves.svg", "penrose.svg", "pixelated_text.svg",
+    "qcurve_demo.svg", "rhomboid.svg", "rotate.svg", "scale.svg", "single_state.svg",
+    "skewX.svg", "skewY.svg", "smooth_curves.svg", "states_map.svg", "translate.svg",
+    "united-kingdom.svg", "video_icon.svg", "watch_the_decimals.svg", "weight.svg",
+  ]
+  for fixture in fixtures {
+    let svg = loader.load("svg/testdata/manim/\{fixture}", center=false) catch {
+      _ => fail("failed to parse Manim fixture \{fixture}")
+    }
+    let object = svg.object()
+    assert_true(
+      object.bounds() is Some(_),
+      msg="\{fixture} should produce finite bounds",
+    )
+    assert_true(
+      path_count(object) > 0,
+      msg="\{fixture} should produce at least one path",
+    )
+  }
+}

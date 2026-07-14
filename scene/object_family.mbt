@@ -21,6 +21,23 @@ pub fn Scene::family(
 }
 
 ///|
+pub fn Scene::resolve_family_path(
+  self : Scene,
+  root : ObjectId,
+  path : @object.FamilyPath,
+) -> ObjectId raise SceneError {
+  ignore(self.require_object(root))
+  path
+  .indices()
+  .fold(init=root, (current, index) => {
+    match self.objects.get(current).bind(object => object.children.get(index)) {
+      Some(child) => child
+      None => raise UnknownFamilyPath(root, path)
+    }
+  })
+}
+
+///|
 fn Scene::collect_family(self : Scene, id : ObjectId) -> Array[ObjectId] {
   match self.objects.get(id) {
     None => []

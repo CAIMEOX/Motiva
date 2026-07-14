@@ -18,7 +18,7 @@ priv enum ActiveAnimationKind {
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
   ActiveScale(ObjectId, start~ : @object.Object, spec~ : ScaleSpec)
   ActiveRotate(ObjectId, start~ : @object.Object, spec~ : RotationSpec)
-  ActiveReveal(ObjectId, source~ : @object.Object)
+  ActiveReveal(ObjectId, source~ : @object.Object, family_size~ : Int)
   ActiveDrawBorderThenFill(
     ObjectId,
     source~ : @object.Object,
@@ -203,7 +203,7 @@ fn ActiveAnimation::reveal(
   timing~ : Timing,
 ) -> ActiveAnimation {
   {
-    kind: ActiveReveal(id, source~),
+    kind: ActiveReveal(id, source~, family_size=create_family_size(source)),
     timing,
     run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::new(
@@ -391,9 +391,12 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
         FramePatch::put(id, start),
         FramePatch::ensure_visible(id),
       ])
-    ActiveReveal(id, source~) =>
+    ActiveReveal(id, source~, family_size~) =>
       FramePatch::all([
-        FramePatch::put(id, sample_create_object(source, 0.0)),
+        FramePatch::put(
+          id,
+          sample_create_object(source, 0.0, self.timing, family_size),
+        ),
         FramePatch::ensure_visible(id),
       ])
     ActiveDrawBorderThenFill(id, source~, outline~) =>
@@ -409,9 +412,10 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
 ///|
 fn ActiveAnimation::sample(
   self : ActiveAnimation,
-  alpha : Double,
+  raw_alpha : Double,
 ) -> FramePatch {
-  let alpha = clamp_alpha(alpha)
+  let raw_alpha = clamp_alpha(raw_alpha)
+  let alpha = self.timing.apply_rate(raw_alpha)
   if !self.lifecycle.mutates_object {
     FramePatch::empty()
   } else {
@@ -432,9 +436,12 @@ fn ActiveAnimation::sample(
           FramePatch::put(id, sample_rotate_object(start, spec, alpha)),
           FramePatch::ensure_visible(id),
         ])
-      ActiveReveal(id, source~) =>
+      ActiveReveal(id, source~, family_size~) =>
         FramePatch::all([
-          FramePatch::put(id, sample_create_object(source, alpha)),
+          FramePatch::put(
+            id,
+            sample_create_object(source, raw_alpha, self.timing, family_size),
+          ),
           FramePatch::ensure_visible(id),
         ])
       ActiveDrawBorderThenFill(id, source~, outline~) =>
@@ -458,7 +465,7 @@ fn ActiveAnimation::sample_at_time(
   match self.kind {
     ActiveGroup(children, natural_run_time~) =>
       self.sample_group_at_time(children, natural_run_time, elapsed)
-    _ => self.sample(self.alpha_at_time(elapsed))
+    _ => self.sample(self.timing.raw_alpha_at_run_time(elapsed, self.run_time))
   }
 }
 
@@ -517,23 +524,58 @@ fn ActiveChild::sample_at_group_time(
 ///|
 fn sample_create_object(
   source : @object.Object,
-  alpha : Double,
+  raw_alpha : Double,
+  timing : Timing,
+  family_size : Int,
 ) -> @object.Object {
-  @object.Object::new(
-    node=sample_create_node(source.node, alpha),
-    transform=source.transform,
-    z_index=source.z_index,
-  )
+  sample_create_family_member(source, raw_alpha, timing, family_size, 0).0
 }
 
 ///|
-fn sample_create_node(source : @object.Node, alpha : Double) -> @object.Node {
-  match source {
-    Empty => Empty
+fn create_family_size(source : @object.Object) -> Int {
+  match source.node {
+    Empty => 0
+    Path(_, _) => 1
     Group(children) =>
-      Group(children.map(child => sample_create_object(child, alpha)))
-    Path(path, style) => Path(sample_create_path(path, alpha), style)
+      children.fold(init=0, (size, child) => size + create_family_size(child))
   }
+}
+
+///|
+fn sample_create_family_member(
+  source : @object.Object,
+  raw_alpha : Double,
+  timing : Timing,
+  family_size : Int,
+  family_index : Int,
+) -> (@object.Object, Int) {
+  let (node, next_index) = match source.node {
+    Empty => (@object.Empty, family_index)
+    Path(path, style) => {
+      let alpha = timing.family_alpha(raw_alpha, family_index, family_size)
+      (@object.Path(sample_create_path(path, alpha), style), family_index + 1)
+    }
+    Group(children) => {
+      let sampled : Array[@object.Object] = []
+      let mut next_index = family_index
+      for child in children {
+        let (next, after_child) = sample_create_family_member(
+          child, raw_alpha, timing, family_size, next_index,
+        )
+        sampled.push(next)
+        next_index = after_child
+      }
+      (@object.Group(sampled), next_index)
+    }
+  }
+  (
+    @object.Object::new(
+      node~,
+      transform=source.transform,
+      z_index=source.z_index,
+    ),
+    next_index,
+  )
 }
 
 ///|
@@ -664,7 +706,12 @@ fn sample_draw_border_then_fill(
   alpha : Double,
 ) -> @object.Object {
   if alpha < 0.5 {
-    sample_create_object(outline, alpha * 2.0)
+    sample_create_object(
+      outline,
+      alpha * 2.0,
+      Timing::new(),
+      create_family_size(outline),
+    )
   } else {
     interpolate_object(outline, source, (alpha - 0.5) * 2.0)
   }

@@ -13,7 +13,7 @@ pub fn MovieWriter::mp4(
   output_dir? : String = "output/frames",
   frame_prefix? : String = "frame",
   frame_padding? : Int = 4,
-  play_config? : @scene.PlayConfig = @scene.PlayConfig::image_sequence(),
+  play_config? : @scene.PlayConfig = @scene.PlayConfig::default(),
   frame_rate~ : Double,
   movie_path~ : String,
 ) -> MovieWriter {

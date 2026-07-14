@@ -112,6 +112,13 @@ pub fn Dot::path(Self) -> Path3D
 pub impl IntoObject for Dot
 pub impl Default for Dot
 
+pub struct FamilyPath {
+  // private fields
+} derive(Eq)
+pub fn FamilyPath::child(Self, Int) -> Self
+pub fn FamilyPath::indices(Self) -> Array[Int]
+pub fn FamilyPath::root() -> Self
+
 pub(all) struct FunctionGraph {
   function : (Double) -> Double
   x_min : Double
@@ -251,7 +258,7 @@ pub(all) struct Rgba {
   g : Double
   b : Double
   a : Double
-}
+} derive(Eq, Hash)
 pub fn Rgba::black() -> Self
 pub fn Rgba::blue() -> Self
 pub fn Rgba::cyan() -> Self
@@ -271,7 +278,7 @@ pub(all) struct ShapeStyle {
   stroke : Rgba?
   stroke_opacity : Double
   stroke_width : Double
-}
+} derive(Eq, Hash)
 pub fn ShapeStyle::filled(color~ : Rgba) -> Self
 pub fn ShapeStyle::new(fill? : Rgba, fill_opacity? : Double, stroke? : Rgba, stroke_opacity? : Double, stroke_width? : Double) -> Self
 pub fn ShapeStyle::set_color(Self, Rgba) -> Self

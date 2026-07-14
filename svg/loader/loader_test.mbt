@@ -67,3 +67,44 @@ async test "SvgLoader can clear cached resources" {
     }
   }
 }
+
+///|
+async test "SvgLoader forwards styles and keeps styled cache entries distinct" {
+  @async.with_task_group() <| root => {
+    let path = "_build/svg_loader_style_test.svg"
+    root.add_defer(() => @fs.remove(path))
+    let source =
+      #|<svg><rect width="1" height="1"/></svg>
+    @fs.write_file(path, source, create_mode=CreateOrTruncate)
+    let loader = SvgLoader::new()
+    let defaults = @object.ShapeStyle::new(
+      fill=@object.Rgba::red(),
+      fill_opacity=1.0,
+    )
+    let style_override = @object.ShapeStyle::new(
+      fill=@object.Rgba::blue(),
+      fill_opacity=0.5,
+    )
+    let inherited = loader.load(path, center=false, default_style=defaults)
+    let overridden = loader.load(
+      path,
+      center=false,
+      override_style=style_override,
+    )
+    guard inherited.object().node is Group([inherited_rect]) &&
+      inherited_rect.node is Path(_, inherited_style) &&
+      inherited_style.fill is Some(inherited_fill) else {
+      fail("default style should reach the imported path")
+    }
+    guard overridden.object().node is Group([overridden_rect]) &&
+      overridden_rect.node is Path(_, overridden_style) &&
+      overridden_style.fill is Some(overridden_fill) else {
+      fail("override style should reach the imported path")
+    }
+    assert_eq(inherited_fill.r, 1.0)
+    assert_eq(inherited_fill.b, 0.0)
+    assert_eq(overridden_fill.r, 0.0)
+    assert_eq(overridden_fill.b, 1.0)
+    assert_eq(overridden_style.fill_opacity, 0.5)
+  }
+}

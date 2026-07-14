@@ -10,6 +10,8 @@ struct SvgCacheKey {
   center : Bool
   height : Double?
   width : Double?
+  default_style : @object.ShapeStyle?
+  override_style : @object.ShapeStyle?
 } derive(Eq, Hash)
 
 ///|
@@ -34,8 +36,10 @@ pub async fn SvgLoader::load(
   center? : Bool = true,
   height? : Double,
   width? : Double,
+  default_style? : @object.ShapeStyle,
+  override_style? : @object.ShapeStyle,
 ) -> @svg.SvgObject raise SvgLoadError {
-  let key = { path, center, height, width }
+  let key = { path, center, height, width, default_style, override_style }
   match self.cache.get(key) {
     Some(object) => object.copy()
     None => {
@@ -47,6 +51,8 @@ pub async fn SvgLoader::load(
         center~,
         height?,
         width?,
+        default_style?,
+        override_style?,
       ) catch {
         error => raise Parse(error)
       }

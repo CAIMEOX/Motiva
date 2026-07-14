@@ -3,10 +3,12 @@ import {
   "CAIMEOX/Motiva/svg",
   "moonbitlang/async/fs",
   "moonbitlang/async/io",
+  "moonbitlang/async/process",
 }
 
 import {
+  "CAIMEOX/Motiva/scene",
   "moonbitlang/async",
-} for "test"
+} for "wbtest"
 
 supported_targets = "+native"

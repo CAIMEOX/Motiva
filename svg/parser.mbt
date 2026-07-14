@@ -4,6 +4,8 @@ pub fn SvgObject::parse_string(
   center? : Bool = true,
   height? : Double,
   width? : Double,
+  default_style? : @object.ShapeStyle,
+  override_style? : @object.ShapeStyle,
 ) -> SvgObject raise SvgError {
   let document = match @xml.xml_from_string(source) {
     Some(document) => document
@@ -11,12 +13,21 @@ pub fn SvgObject::parse_string(
   }
   let definitions : Map[String, @xml.XMLElement] = {}
   collect_definitions(document.root, definitions)
+  let groups : Map[String, Array[@object.FamilyPath]] = {}
+  let diagnostics : Array[SvgDiagnostic] = []
   let object = evaluate_element(
     document.root,
-    SvgContext::root(definitions),
+    SvgContext::root(definitions, default_style, groups, diagnostics),
     referenced=false,
   ).unwrap_or(@object.Object::empty())
-  { object: normalize_svg_object(object, center~, height?, width?) }
+  let object = normalize_svg_object(object, center~, height?, width?)
+  {
+    object: override_style.map_or(object, style => {
+      apply_override_style(object, style)
+    }),
+    groups,
+    diagnostics,
+  }
 }
 
 ///|
@@ -25,8 +36,17 @@ pub fn parse_string(
   center? : Bool = true,
   height? : Double,
   width? : Double,
+  default_style? : @object.ShapeStyle,
+  override_style? : @object.ShapeStyle,
 ) -> @object.Object raise SvgError {
-  SvgObject::parse_string(source, center~, height?, width?).object()
+  SvgObject::parse_string(
+    source,
+    center~,
+    height?,
+    width?,
+    default_style?,
+    override_style?,
+  ).object()
 }
 
 ///|
@@ -98,9 +118,18 @@ fn evaluate_element(
         ),
       )
     _ if is_non_rendered_element(name) => None
-    _ => raise UnsupportedElement(name)
+    _ => {
+      context.report_skipped(name)
+      None
+    }
   }
-  base
+  match base {
+    Some(object) => {
+      context.record_id(element)
+      Some(object)
+    }
+    None => None
+  }
 }
 
 ///|
@@ -115,14 +144,15 @@ fn evaluate_svg_element(
   }
   let context = context.enter(style, parse_transform_attribute(element))
   if viewport.empty {
+    context.record_id(element)
     Some(@object.Object::empty())
   } else {
-    Some(
-      evaluate_group(
-        element,
-        context.enter_viewport(viewport.user, viewport.transform),
-      ),
+    let object = evaluate_group(
+      element,
+      context.enter_viewport(viewport.user, viewport.transform),
     )
+    context.record_id(element)
+    Some(object)
   }
 }
 
@@ -171,11 +201,20 @@ fn evaluate_group(
   context : SvgContext,
 ) -> @object.Object raise SvgError {
   let children : Array[@object.Object] = []
+  let mut rendered_index = 0
   for child in element.children {
     match child {
       Element(child_element) =>
-        match evaluate_element(child_element, context, referenced=false) {
-          Some(object) => children.push(object)
+        match
+          evaluate_element(
+            child_element,
+            context.at_child(rendered_index),
+            referenced=false,
+          ) {
+          Some(object) => {
+            children.push(object)
+            rendered_index = rendered_index + 1
+          }
           None => ()
         }
       _ => ()
@@ -259,9 +298,12 @@ fn evaluate_symbol(
       0.0,
       0.0,
     )
-    Some(
-      evaluate_group(symbol, context.enter_viewport(user_viewport, transform)),
+    let object = evaluate_group(
+      symbol,
+      context.enter_viewport(user_viewport, transform),
     )
+    context.record_id(symbol)
+    Some(object)
   }
 }
 
@@ -769,8 +811,7 @@ fn is_non_rendered_element(name : String) -> Bool {
   name == "title" ||
   name == "desc" ||
   name == "metadata" ||
-  name == "style" ||
-  name == "text"
+  name == "style"
 }
 
 ///|

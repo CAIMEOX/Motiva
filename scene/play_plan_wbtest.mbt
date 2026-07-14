@@ -31,6 +31,18 @@ test "play plan frame times use scene frame rate" {
 }
 
 ///|
+test "default play plan samples a half-open time interval" {
+  let scene = Scene::new(config=SceneConfig::new(frame_rate=10.0))
+  let square = scene.object(@object.Square::new())
+  let plan = scene.compile_play_plan([Animation::create(square, run_time=0.25)])
+  assert_eq(plan.frame_count(), 3)
+  guard plan.frame_times().last() is Some(last) else {
+    fail("continuous play plan should contain sampled frames")
+  }
+  assert_plan_close(last.play_time, 0.2)
+}
+
+///|
 test "play plan applies sampled animation state to scene" {
   let scene = Scene::new()
   let square = scene.object(@object.Square::new())

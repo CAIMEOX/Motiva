@@ -133,13 +133,40 @@ fn Timing::alpha_at_run_time(
   elapsed : Double,
   run_time : Double,
 ) -> Double {
-  let raw_alpha = self.raw_alpha_at_run_time(elapsed, run_time)
+  self.apply_rate(self.raw_alpha_at_run_time(elapsed, run_time))
+}
+
+///|
+fn Timing::apply_rate(self : Timing, raw_alpha : Double) -> Double {
+  let raw_alpha = clamp_unit(raw_alpha)
   let local_alpha = if self.reverse_rate_function {
     1.0 - raw_alpha
   } else {
     raw_alpha
   }
   self.rate_func.sample(local_alpha)
+}
+
+///|
+fn Timing::family_alpha(
+  self : Timing,
+  raw_alpha : Double,
+  index : Int,
+  family_size : Int,
+) -> Double {
+  if family_size <= 0 {
+    self.apply_rate(raw_alpha)
+  } else {
+    let full_length = (family_size - 1).to_double() * self.lag_ratio + 1.0
+    let local_alpha = clamp_unit(raw_alpha) * full_length -
+      index.to_double() * self.lag_ratio
+    let directed_alpha = if self.reverse_rate_function {
+      1.0 - local_alpha
+    } else {
+      local_alpha
+    }
+    self.rate_func.sample(directed_alpha)
+  }
 }
 
 ///|
@@ -443,12 +470,18 @@ pub fn[T : IntoAnimation] Animation::lagged_start(
 pub fn Animation::create(
   id : ObjectId,
   run_time? : Double = 1.0,
-  rate_func? : RateFunc = Linear,
+  rate_func? : RateFunc = Smooth,
   reverse_rate_function? : Bool = false,
+  lag_ratio? : Double = 1.0,
 ) -> Animation {
   Animation::new(
     Create(id),
-    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+    timing=Timing::new(
+      run_time~,
+      rate_func~,
+      reverse_rate_function~,
+      lag_ratio~,
+    ),
   )
 }
 
