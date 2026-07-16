@@ -1,0 +1,12 @@
+import {
+  "CAIMEOX/Motiva/object",
+  "CAIMEOX/Motiva/svg",
+  "moonbitlang/core/encoding/utf8",
+}
+
+supported_targets = "+native"
+
+options(
+  link: { "native": { "stub-cc-flags": "${build.PANGOCAIRO_CC_FLAGS}" } },
+  "native-stub": [ "pango_native.c" ],
+)

@@ -28,3 +28,7 @@ import {
   "moonbitlang/async@0.19.1",
   "moonbit-community/XMLParser@0.2.5",
 }
+
+options(
+  "--moonbit-unstable-prebuild": "build.js",
+)

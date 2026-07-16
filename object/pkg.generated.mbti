@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "CAIMEOX/Motiva/object"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub fn[T : IntoObject] into_object(T) -> Object
 
@@ -114,7 +118,7 @@ pub impl Default for Dot
 
 pub struct FamilyPath {
   // private fields
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn FamilyPath::child(Self, Int) -> Self
 pub fn FamilyPath::indices(Self) -> Array[Int]
 pub fn FamilyPath::root() -> Self

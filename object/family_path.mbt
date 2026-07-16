@@ -1,7 +1,7 @@
 ///|
 pub struct FamilyPath {
   priv indices : Array[Int]
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub fn FamilyPath::root() -> FamilyPath {
