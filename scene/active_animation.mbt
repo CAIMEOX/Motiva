@@ -2,7 +2,7 @@
 priv struct AnimationLifecycle {
   introducer : Bool
   remover : Bool
-  mutates_object : Bool
+  has_frame_effect : Bool
 }
 
 ///|
@@ -21,6 +21,7 @@ priv struct ReplacementFinish {
 ///|
 priv enum ActiveAnimationKind {
   ActiveWait
+  ActiveCamera(start~ : @camera.Camera, target~ : @camera.Camera)
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
   ActiveScale(ObjectId, start~ : @object.Object, spec~ : ScaleSpec)
   ActiveRotate(ObjectId, start~ : @object.Object, spec~ : RotationSpec)
@@ -50,14 +51,18 @@ priv struct ActiveAnimation {
 fn AnimationLifecycle::new(
   introducer~ : Bool,
   remover~ : Bool,
-  mutates_object~ : Bool,
+  has_frame_effect~ : Bool,
 ) -> AnimationLifecycle {
-  { introducer, remover, mutates_object }
+  { introducer, remover, has_frame_effect }
 }
 
 ///|
 fn AnimationLifecycle::passive() -> AnimationLifecycle {
-  AnimationLifecycle::new(introducer=false, remover=false, mutates_object=false)
+  AnimationLifecycle::new(
+    introducer=false,
+    remover=false,
+    has_frame_effect=false,
+  )
 }
 
 ///|
@@ -67,6 +72,12 @@ fn ActiveAnimation::compile(
 ) -> ActiveAnimation raise SceneError {
   match animation.kind {
     Wait => ActiveAnimation::wait(animation.timing)
+    MoveCamera(motion) => {
+      let start = scene.camera()
+      let target = motion.resolve(start)
+      validate_camera(target)
+      ActiveAnimation::camera(start~, target~, timing=animation.timing)
+    }
     Create(id) =>
       ActiveAnimation::reveal(
         id,
@@ -146,6 +157,24 @@ fn ActiveAnimation::compile(
 }
 
 ///|
+fn ActiveAnimation::camera(
+  start~ : @camera.Camera,
+  target~ : @camera.Camera,
+  timing~ : Timing,
+) -> ActiveAnimation {
+  {
+    kind: ActiveCamera(start~, target~),
+    timing,
+    run_time: timing.resolve_run_time(1.0),
+    lifecycle: AnimationLifecycle::new(
+      introducer=false,
+      remover=false,
+      has_frame_effect=true,
+    ),
+  }
+}
+
+///|
 fn ActiveAnimation::wait(timing : Timing) -> ActiveAnimation {
   {
     kind: ActiveWait,
@@ -170,7 +199,7 @@ fn ActiveAnimation::transform(
     lifecycle=AnimationLifecycle::new(
       introducer=false,
       remover=false,
-      mutates_object=true,
+      has_frame_effect=true,
     ),
   )
 }
@@ -205,7 +234,7 @@ fn ActiveAnimation::scale(
     lifecycle: AnimationLifecycle::new(
       introducer=false,
       remover=false,
-      mutates_object=true,
+      has_frame_effect=true,
     ),
   }
 }
@@ -224,7 +253,7 @@ fn ActiveAnimation::rotate(
     lifecycle: AnimationLifecycle::new(
       introducer=false,
       remover=false,
-      mutates_object=true,
+      has_frame_effect=true,
     ),
   }
 }
@@ -242,7 +271,7 @@ fn ActiveAnimation::reveal(
     lifecycle: AnimationLifecycle::new(
       introducer=true,
       remover=false,
-      mutates_object=true,
+      has_frame_effect=true,
     ),
   }
 }
@@ -262,7 +291,7 @@ fn ActiveAnimation::fade_in(
     lifecycle=AnimationLifecycle::new(
       introducer=true,
       remover=false,
-      mutates_object=true,
+      has_frame_effect=true,
     ),
   )
 }
@@ -282,7 +311,7 @@ fn ActiveAnimation::fade_out(
     lifecycle=AnimationLifecycle::new(
       introducer=false,
       remover=true,
-      mutates_object=true,
+      has_frame_effect=true,
     ),
   )
 }
@@ -307,7 +336,7 @@ fn ActiveAnimation::draw_border_then_fill(
     lifecycle: AnimationLifecycle::new(
       introducer=true,
       remover=false,
-      mutates_object=true,
+      has_frame_effect=true,
     ),
   }
 }
@@ -350,6 +379,9 @@ fn validate_family_animation_targets(
       guard animations.get(second_index) is Some(second_animation) else {
         continue
       }
+      if first_animation.affects_camera() && second_animation.affects_camera() {
+        raise ConflictingCameraAnimations
+      }
       for first in first_animation.affected_ids() {
         for second in second_animation.affected_ids() {
           if scene.same_family_branch(first, second) {
@@ -387,8 +419,8 @@ fn group_lifecycle(
   ) => {
     introducer: lifecycle.introducer || child.animation.lifecycle.introducer,
     remover: lifecycle.remover || child.animation.lifecycle.remover,
-    mutates_object: lifecycle.mutates_object ||
-    child.animation.lifecycle.mutates_object,
+    has_frame_effect: lifecycle.has_frame_effect ||
+    child.animation.lifecycle.has_frame_effect,
   })
   match replacement {
     None => lifecycle
@@ -396,7 +428,7 @@ fn group_lifecycle(
       AnimationLifecycle::new(
         introducer=true,
         remover=true,
-        mutates_object=true,
+        has_frame_effect=true,
       )
   }
 }
@@ -409,7 +441,7 @@ fn ActiveAnimation::run_time(self : ActiveAnimation) -> Double {
 ///|
 fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
   match self.kind {
-    ActiveWait => []
+    ActiveWait | ActiveCamera(..) => []
     ActiveTransform(id, ..)
     | ActiveScale(id, ..)
     | ActiveRotate(id, ..)
@@ -433,10 +465,21 @@ fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
 }
 
 ///|
+fn ActiveAnimation::affects_camera(self : ActiveAnimation) -> Bool {
+  match self.kind {
+    ActiveCamera(..) => true
+    ActiveGroup(children, ..) =>
+      children.any(child => child.animation.affects_camera())
+    _ => false
+  }
+}
+
+///|
 fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
   let _ = self.lifecycle.introducer
   match self.kind {
     ActiveWait => FramePatch::empty()
+    ActiveCamera(start~, ..) => FramePatch::set_camera(start)
     ActiveTransform(id, start~, ..) =>
       FramePatch::all([
         FramePatch::put(id, start),
@@ -486,11 +529,13 @@ fn ActiveAnimation::sample(
 ) -> FramePatch {
   let raw_alpha = clamp_alpha(raw_alpha)
   let alpha = self.timing.apply_rate(raw_alpha)
-  if !self.lifecycle.mutates_object {
+  if !self.lifecycle.has_frame_effect {
     FramePatch::empty()
   } else {
     match self.kind {
       ActiveWait => FramePatch::empty()
+      ActiveCamera(start~, target~) =>
+        FramePatch::set_camera(start.interpolate(target, alpha))
       ActiveTransform(id, start~, target~) =>
         FramePatch::all([
           FramePatch::put(id, interpolate_object(start, target, alpha)),

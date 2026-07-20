@@ -110,25 +110,42 @@ test "snapshot sorts family leaves and top-level objects by z index" {
 }
 
 ///|
-test "camera derives missing frame dimension from pixel aspect" {
-  let wide = Camera::new(pixel_width=1280, pixel_height=720, frame_width=6.0)
-  assert_render_close(wide.frame_width, 6.0)
-  assert_render_close(wide.frame_height, 3.375)
-  let tall = Camera::new(pixel_width=1280, pixel_height=720, frame_height=4.0)
-  assert_render_close(tall.frame_width, 64.0 / 9.0)
-  assert_render_close(tall.frame_height, 4.0)
-  let square = Camera::new(pixel_width=64, pixel_height=64)
-  assert_render_close(square.frame_width, 8.0)
-  assert_render_close(square.frame_height, 8.0)
+test "snapshot preserves 2D draw order across camera depth" {
+  let scene = @scene.Scene::new(
+    camera=@camera.Camera::new(projection=Perspective),
+  )
+  let near = scene.add(
+    @object.into_object(@object.Square::new()).with_transform(
+      @object.Transform::translate(@object.Vec3::new(x=0.0, y=0.0, z=2.0)),
+    ),
+  )
+  let far = scene.add(
+    @object.into_object(@object.Circle::new()).with_transform(
+      @object.Transform::translate(@object.Vec3::new(x=0.0, y=0.0, z=-2.0)),
+    ),
+  )
+  guard FrameSnapshot::from_scene(scene).items is [front, back] else {
+    fail("snapshot should preserve 2D draw order")
+  }
+  assert_true(front.id == near)
+  assert_true(back.id == far)
+}
+
+///|
+test "snapshot carries resolved fixed camera spaces" {
+  let scene = @scene.Scene::new()
+  let fixed = scene.add(@object.Square::new())
+  scene.add_fixed_in_frame(fixed)
+  guard FrameSnapshot::from_scene(scene).items is [item] else {
+    fail("snapshot should contain fixed object")
+  }
+  assert_true(item.camera_space is FixedInFrame)
 }
 
 ///|
 test "cairo renderer renders visible path objects into argb32 bytes" {
-  let scene = @scene.Scene::new()
-  let style = @object.ShapeStyle::filled(color=@object.Rgba::white())
-  ignore(scene.add(@object.Square::new(side_length=2.0, style~)))
-  let renderer = CairoRenderer::new(
-    camera=Camera::new(
+  let scene = @scene.Scene::new(
+    camera=@camera.Camera::new(
       pixel_width=64,
       pixel_height=64,
       frame_width=4.0,
@@ -136,6 +153,9 @@ test "cairo renderer renders visible path objects into argb32 bytes" {
       background=@object.Rgba::black(),
     ),
   )
+  let style = @object.ShapeStyle::filled(color=@object.Rgba::white())
+  ignore(scene.add(@object.Square::new(side_length=2.0, style~)))
+  let renderer = CairoRenderer::new()
   let frame = renderer.render_scene(scene)
   assert_eq(frame.width, 64)
   assert_eq(frame.height, 64)
@@ -155,10 +175,8 @@ test "SVG context rendering matches PNG golden" {
     #|  <use href="#tile" width="20" height="20" color="red" />
     #|  <use href="#tile" x="20" width="20" height="20" color="blue" />
     #|</svg>
-  let scene = @scene.Scene::new()
-  ignore(scene.add(@svg.SvgObject::parse_string(source, center=false)))
-  let renderer = CairoRenderer::new(
-    camera=Camera::new(
+  let scene = @scene.Scene::new(
+    camera=@camera.Camera::new(
       pixel_width=80,
       pixel_height=40,
       frame_width=4.0,
@@ -167,6 +185,8 @@ test "SVG context rendering matches PNG golden" {
       background=@object.Rgba::black(),
     ),
   )
+  ignore(scene.add(@svg.SvgObject::parse_string(source, center=false)))
+  let renderer = CairoRenderer::new()
   let actual = renderer.render_scene(scene).data
   let golden = @cairoon.Surface::image_from_png(
     "render/testdata/svg_context_golden.png",
@@ -181,10 +201,8 @@ async test "Manim SVG fixture rendering matches PNG golden" {
     "svg/testdata/manim/A.svg",
     height=3.0,
   )
-  let scene = @scene.Scene::new()
-  ignore(scene.add(svg))
-  let renderer = CairoRenderer::new(
-    camera=Camera::new(
+  let scene = @scene.Scene::new(
+    camera=@camera.Camera::new(
       pixel_width=160,
       pixel_height=90,
       frame_width=8.0,
@@ -192,6 +210,8 @@ async test "Manim SVG fixture rendering matches PNG golden" {
       background=@object.Rgba::black(),
     ),
   )
+  ignore(scene.add(svg))
+  let renderer = CairoRenderer::new()
   let actual = renderer.render_scene(scene).data
   let golden = @cairoon.Surface::image_from_png(
     "render/testdata/manim_A_golden.png",
@@ -202,10 +222,9 @@ async test "Manim SVG fixture rendering matches PNG golden" {
 
 ///|
 test "cairo renderer renders play plan frames" {
-  let scene = @scene.Scene::new(config=@scene.SceneConfig::new(frame_rate=2.0))
-  let square = scene.object(@object.Square::new(side_length=2.0))
-  let renderer = CairoRenderer::new(
-    camera=Camera::new(
+  let scene = @scene.Scene::new(
+    config=@scene.SceneConfig::new(frame_rate=2.0),
+    camera=@camera.Camera::new(
       pixel_width=64,
       pixel_height=64,
       frame_width=4.0,
@@ -213,6 +232,8 @@ test "cairo renderer renders play plan frames" {
       background=@object.Rgba::black(),
     ),
   )
+  let square = scene.object(@object.Square::new(side_length=2.0))
+  let renderer = CairoRenderer::new()
   let frames = renderer.render_play(scene, [
     square.animate(run_time=1.0).shift(@object.Vec3::new(x=1.0, y=0.0)),
   ])

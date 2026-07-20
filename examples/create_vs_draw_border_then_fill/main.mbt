@@ -10,7 +10,10 @@ using @object {
 }
 
 ///|
-using @render {type CairoRenderer, type Camera, type MovieWriter}
+using @camera {type Camera}
+
+///|
+using @render {type CairoRenderer, type MovieWriter}
 
 ///|
 using @scene {type Animation, type Scene, type SceneConfig}
@@ -35,16 +38,17 @@ async fn animate() -> Unit {
   let frame_prefix = "create_vs_draw_border_then_fill_720p60"
   let frame_dir = "output/frames"
   let movie_path = "output/create_vs_draw_border_then_fill_720p60.mp4"
-  let scene = Scene::new(config=SceneConfig::new(frame_rate=60))
-  let writer = MovieWriter::mp4(
-    renderer=CairoRenderer::new(
-      camera=Camera::new(
-        pixel_width=1280,
-        pixel_height=720,
-        frame_width=6.0,
-        background=Rgba::black(),
-      ),
+  let scene = Scene::new(
+    config=SceneConfig::new(frame_rate=60),
+    camera=Camera::new(
+      pixel_width=1280,
+      pixel_height=720,
+      frame_width=6.0,
+      background=Rgba::black(),
     ),
+  )
+  let writer = MovieWriter::mp4(
+    renderer=CairoRenderer::new(),
     output_dir=frame_dir,
     frame_prefix~,
     frame_padding=4,

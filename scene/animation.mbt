@@ -386,6 +386,7 @@ fn move_object_to(
 ///|
 pub(all) enum AnimationKind {
   Wait
+  MoveCamera(@camera.CameraMotion)
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
   Write(ObjectId, Double?)
@@ -428,6 +429,52 @@ pub fn Animation::new(
 ///|
 pub fn Animation::wait(duration : Double) -> Animation {
   Animation::new(Wait, timing=Timing::new(run_time=duration))
+}
+
+///|
+pub fn Animation::move_camera(
+  frame_center? : @object.Vec3,
+  phi? : Double,
+  theta? : Double,
+  gamma? : Double,
+  zoom? : Double,
+  focal_distance? : Double,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Smooth,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::new(
+    MoveCamera(
+      MoveTo(
+        @camera.CameraTarget::new(
+          frame_center?,
+          phi?,
+          theta?,
+          gamma?,
+          zoom?,
+          focal_distance?,
+        ),
+      ),
+    ),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
+}
+
+///|
+pub fn Animation::orbit_camera(
+  phi_delta? : Double = 0.0,
+  theta_delta? : Double = 2.0 * @math.PI,
+  gamma_delta? : Double = 0.0,
+  run_time? : Double = 5.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::new(
+    MoveCamera(
+      Orbit(@camera.CameraOrbit::new(phi_delta~, theta_delta~, gamma_delta~)),
+    ),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
 }
 
 ///|

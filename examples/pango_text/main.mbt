@@ -5,7 +5,10 @@ using @object {type Object, type Rgba, type Vec3}
 using @pango_native {type MarkupText, type Text, type TextSpan, type TextStyle}
 
 ///|
-using @render {type CairoRenderer, type Camera, type MovieWriter}
+using @camera {type Camera}
+
+///|
+using @render {type CairoRenderer, type MovieWriter}
 
 ///|
 using @scene {type Animation, type Scene, type SceneConfig}
@@ -20,16 +23,17 @@ async fn animate() -> Unit {
   let frame_prefix = "pango_native_showcase_720p60"
   let frame_dir = "output/frames"
   let movie_path = "output/pango_native_showcase_720p60.mp4"
-  let scene = Scene::new(config=SceneConfig::new(frame_rate=60))
-  let writer = MovieWriter::mp4(
-    renderer=CairoRenderer::new(
-      camera=Camera::new(
-        pixel_width=1280,
-        pixel_height=720,
-        frame_width=8.0,
-        background=Rgba::rgb(r=0.025, g=0.03, b=0.045),
-      ),
+  let scene = Scene::new(
+    config=SceneConfig::new(frame_rate=60),
+    camera=Camera::new(
+      pixel_width=1280,
+      pixel_height=720,
+      frame_width=8.0,
+      background=Rgba::rgb(r=0.025, g=0.03, b=0.045),
     ),
+  )
+  let writer = MovieWriter::mp4(
+    renderer=CairoRenderer::new(),
     output_dir=frame_dir,
     frame_prefix~,
     frame_padding=4,

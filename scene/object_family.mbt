@@ -110,13 +110,32 @@ fn Scene::insert_object_with_parent(
   match object.node {
     Group(children) => {
       let shell = family_shell(object)
-      self.objects[id] = { object: shell, state, parent, children: [] }
+      self.objects[id] = {
+        object: shell,
+        state,
+        parent,
+        children: [],
+        camera_binding: CameraWorld,
+      }
       let child_ids = children.map(child => {
         self.insert_object_with_parent(child, state, Some(id))
       })
-      self.objects[id] = { object: shell, state, parent, children: child_ids }
+      self.objects[id] = {
+        object: shell,
+        state,
+        parent,
+        children: child_ids,
+        camera_binding: CameraWorld,
+      }
     }
-    _ => self.objects[id] = { object, state, parent, children: [] }
+    _ =>
+      self.objects[id] = {
+        object,
+        state,
+        parent,
+        children: [],
+        camera_binding: CameraWorld,
+      }
   }
   id
 }
@@ -187,6 +206,7 @@ fn Scene::write_local_object(
         state: scene_object.state,
         parent: scene_object.parent,
         children: scene_object.children,
+        camera_binding: scene_object.camera_binding,
       }
     }
     _ =>
@@ -195,6 +215,7 @@ fn Scene::write_local_object(
         state: scene_object.state,
         parent: scene_object.parent,
         children: [],
+        camera_binding: scene_object.camera_binding,
       }
   }
 }

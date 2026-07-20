@@ -1,5 +1,4 @@
 import {
-  "CAIMEOX/Motiva/camera",
   "CAIMEOX/Motiva/object",
   "moonbitlang/core/math",
 }

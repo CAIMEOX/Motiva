@@ -1,67 +1,11 @@
 ///|
 pub(all) suberror RenderError {
   Cairo(@cairoon.CairoError)
+  Camera(@camera.CameraError)
   Ffmpeg(@ffmpeg.FfmpegError)
   Scene(@scene.SceneError)
   MissingObject(@scene.ObjectId)
   OutputFrameCountMismatch(expected~ : Int, actual~ : Int)
-}
-
-///|
-pub(all) struct Camera {
-  pixel_width : Int
-  pixel_height : Int
-  frame_width : Double
-  frame_height : Double
-  frame_center : @object.Vec3
-  background : @object.Rgba
-  cairo_line_width_multiple : Double
-}
-
-///|
-pub fn Camera::new(
-  pixel_width? : Int = 1280,
-  pixel_height? : Int = 720,
-  frame_width? : Double,
-  frame_height? : Double,
-  frame_center? : @object.Vec3 = @object.Vec3::zero(),
-  background? : @object.Rgba = @object.Rgba::black(),
-  cairo_line_width_multiple? : Double = 0.01,
-) -> Camera {
-  let (frame_width, frame_height) = resolve_frame_size(
-    pixel_width, pixel_height, frame_width, frame_height,
-  )
-  {
-    pixel_width,
-    pixel_height,
-    frame_width,
-    frame_height,
-    frame_center,
-    background,
-    cairo_line_width_multiple,
-  }
-}
-
-///|
-pub impl Default for Camera with fn default() -> Camera {
-  Camera::new()
-}
-
-///|
-fn resolve_frame_size(
-  pixel_width : Int,
-  pixel_height : Int,
-  frame_width : Double?,
-  frame_height : Double?,
-) -> (Double, Double) {
-  let default_frame_height = 8.0
-  let aspect = pixel_width.to_double() / pixel_height.to_double()
-  match (frame_width, frame_height) {
-    (None, None) => (default_frame_height * aspect, default_frame_height)
-    (Some(width), None) => (width, width / aspect)
-    (None, Some(height)) => (height * aspect, height)
-    (Some(width), Some(height)) => (width, height)
-  }
 }
 
 ///|
@@ -75,22 +19,24 @@ pub(all) struct RenderItem {
   id : @scene.ObjectId
   object : @object.Object
   layer : RenderLayer
+  camera_space : @camera.CameraSpace
 }
 
 ///|
 pub(all) struct FrameSnapshot {
   time : Double
   frame_index : Int
-  camera : Camera
+  camera : @camera.Camera
   items : Array[RenderItem]
 }
 
 ///|
 pub fn FrameSnapshot::from_scene(
   scene : @scene.Scene,
-  camera? : Camera = Camera::default(),
   frame_index? : Int = 0,
 ) -> FrameSnapshot raise RenderError {
+  let camera = scene.camera()
+  validate_render_camera(camera)
   let foreground_roots = scene.foreground_objects()
   let foreground_ids = collect_family_ids(scene, foreground_roots)
   let main_items : Array[RenderItem] = []
@@ -152,7 +98,8 @@ fn push_family_items(
       match scene.get(id) {
         None => raise MissingObject(id)
         Some({ node: Path(_, _), .. } as object) => {
-          push_z_sorted(items, { id, object, layer })
+          let camera_space = try_scene(() => scene.camera_space(id))
+          push_z_sorted(items, { id, object, layer, camera_space })
           rendered_ids.add(id)
         }
         Some(_) => ()
@@ -171,6 +118,13 @@ fn push_z_sorted(items : Array[RenderItem], item : RenderItem) -> Unit {
 }
 
 ///|
+fn validate_render_camera(camera : @camera.Camera) -> Unit raise RenderError {
+  camera.validate() catch {
+    error => raise Camera(error)
+  }
+}
+
+///|
 pub(all) struct RenderedFrame {
   width : Int
   height : Int
@@ -184,23 +138,23 @@ pub fn RenderedFrame::byte_length(self : RenderedFrame) -> Int {
 
 ///|
 pub(all) struct CairoRenderer {
-  camera : Camera
+  cairo_line_width_multiple : Double
 }
 
 ///|
 pub fn CairoRenderer::new(
-  camera? : Camera = Camera::default(),
+  cairo_line_width_multiple? : Double = 0.01,
 ) -> CairoRenderer {
-  { camera, }
+  { cairo_line_width_multiple, }
 }
 
 ///|
 pub fn CairoRenderer::snapshot(
-  self : CairoRenderer,
+  _self : CairoRenderer,
   scene : @scene.Scene,
   frame_index? : Int = 0,
 ) -> FrameSnapshot raise RenderError {
-  FrameSnapshot::from_scene(scene, camera=self.camera, frame_index~)
+  FrameSnapshot::from_scene(scene, frame_index~)
 }
 
 ///|

@@ -1,5 +1,6 @@
 import {
   "CAIMEOX/cairoon",
+  "CAIMEOX/Motiva/camera",
   "CAIMEOX/Motiva/ffmpeg",
   "CAIMEOX/Motiva/object",
   "CAIMEOX/Motiva/scene",

@@ -1,0 +1,115 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "CAIMEOX/Motiva/camera"
+
+import {
+  "CAIMEOX/Motiva/object",
+}
+
+// Values
+
+// Errors
+pub(all) suberror CameraError {
+  InvalidPixelShape(width~ : Int, height~ : Int)
+  InvalidFrameShape(width~ : Double, height~ : Double)
+  InvalidFrameCenter(@object.Vec3)
+  InvalidOrientation(phi~ : Double, theta~ : Double, gamma~ : Double)
+  InvalidZoom(Double)
+  InvalidFocalDistance(Double)
+  InvalidProjectionScale(Double)
+  InvalidLightSource(@object.Vec3)
+}
+
+// Types and methods
+pub(all) struct Camera {
+  pixel_width : Int
+  pixel_height : Int
+  frame_width : Double
+  frame_height : Double
+  frame_center : @object.Vec3
+  background : @object.Rgba
+  projection : Projection
+  phi : Double
+  theta : Double
+  gamma : Double
+  zoom : Double
+  focal_distance : Double
+  max_projection_scale : Double
+  light_source : @object.Vec3
+  shading_enabled : Bool
+}
+pub fn Camera::camera_to_world(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::depth_at(Self, @object.Vec3, space? : CameraSpace) -> Double
+pub fn Camera::frame_to_pixel(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::interpolate(Self, Self, Double) -> Self
+pub fn Camera::inverse_rotation_transform(Self) -> @object.Transform
+pub fn Camera::is_in_frame(Self, @object.Aabb, space? : CameraSpace) -> Bool
+pub fn Camera::is_pixel_visible(Self, @object.Vec3) -> Bool
+pub fn Camera::new(pixel_width? : Int, pixel_height? : Int, frame_width? : Double, frame_height? : Double, frame_center? : @object.Vec3, background? : @object.Rgba, projection? : Projection, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double, max_projection_scale? : Double, light_source? : @object.Vec3, shading_enabled? : Bool) -> Self
+pub fn Camera::pixel_to_frame(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::project_bounds(Self, @object.Aabb, space? : CameraSpace) -> @object.Aabb
+pub fn Camera::project_camera_point(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::project_point(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::projection_scale(Self, Double) -> Double
+pub fn Camera::rotation_transform(Self) -> @object.Transform
+pub fn Camera::shade(Self, @object.Rgba, point~ : @object.Vec3, normal~ : @object.Vec3) -> @object.Rgba
+pub fn Camera::transform_point(Self, @object.Vec3, CameraSpace) -> @object.Vec3
+pub fn Camera::transform_points(Self, Array[@object.Vec3], space? : CameraSpace) -> Array[@object.Vec3]
+pub fn Camera::unproject_camera_point(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::unproject_point(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::validate(Self) -> Unit raise CameraError
+pub fn Camera::with_background(Self, @object.Rgba) -> Self
+pub fn Camera::with_light_source(Self, @object.Vec3) -> Self
+pub fn Camera::with_pixel_shape(Self, width~ : Int, height~ : Int, fixed? : FixedFrameDimension) -> Self
+pub fn Camera::with_projection(Self, Projection) -> Self
+pub fn Camera::with_shading(Self, Bool) -> Self
+pub fn Camera::with_view(Self, frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double) -> Self
+pub fn Camera::world_to_camera(Self, @object.Vec3) -> @object.Vec3
+pub fn Camera::world_to_pixel(Self, @object.Vec3, space? : CameraSpace) -> @object.Vec3
+pub impl Default for Camera
+
+pub(all) enum CameraMotion {
+  MoveTo(CameraTarget)
+  Orbit(CameraOrbit)
+}
+pub fn CameraMotion::resolve(Self, Camera) -> Camera
+
+pub(all) struct CameraOrbit {
+  phi_delta : Double
+  theta_delta : Double
+  gamma_delta : Double
+}
+pub fn CameraOrbit::new(phi_delta? : Double, theta_delta? : Double, gamma_delta? : Double) -> Self
+pub fn CameraOrbit::resolve(Self, Camera) -> Camera
+
+pub(all) enum CameraSpace {
+  World
+  FixedOrientation(@object.Vec3)
+  FixedInFrame
+}
+
+pub(all) struct CameraTarget {
+  frame_center : @object.Vec3?
+  phi : Double?
+  theta : Double?
+  gamma : Double?
+  zoom : Double?
+  focal_distance : Double?
+}
+pub fn CameraTarget::new(frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double) -> Self
+pub fn CameraTarget::resolve(Self, Camera) -> Camera
+
+pub(all) enum FixedFrameDimension {
+  Width
+  Height
+} derive(Eq)
+
+pub(all) enum Projection {
+  Orthographic
+  Perspective
+  ExponentialPerspective
+} derive(Eq)
+
+// Type aliases
+
+// Traits
+

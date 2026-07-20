@@ -2,6 +2,7 @@
 package "CAIMEOX/Motiva/scene"
 
 import {
+  "CAIMEOX/Motiva/camera",
   "CAIMEOX/Motiva/object",
 }
 
@@ -15,6 +16,8 @@ pub(all) suberror SceneError {
   NonInvertibleFamilyTransform(ObjectId)
   FamilyTopologyMismatch(ObjectId)
   ConflictingFamilyAnimations(ObjectId, ObjectId)
+  ConflictingCameraAnimations
+  Camera(@camera.CameraError)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)
@@ -33,7 +36,9 @@ pub fn Animation::fade_in(ObjectId, run_time? : Double, rate_func? : RateFunc, r
 pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
 pub fn[T : IntoAnimation] Animation::group(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn[T : IntoAnimation] Animation::lagged_start(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
+pub fn Animation::move_camera(frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
+pub fn Animation::orbit_camera(phi_delta? : Double, theta_delta? : Double, gamma_delta? : Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn[T : IntoAnimation] Animation::replacement(source~ : ObjectId, target~ : ObjectId, Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::scale(ObjectId, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
@@ -76,6 +81,7 @@ pub fn[T : IntoAnimation] AnimationGroup::new(Array[T]) -> Self
 
 pub(all) enum AnimationKind {
   Wait
+  MoveCamera(@camera.CameraMotion)
   Create(ObjectId)
   DrawBorderThenFill(ObjectId)
   Write(ObjectId, Double?)
@@ -211,9 +217,14 @@ pub(all) struct Scene {
   mut time : Double
   config : SceneConfig
   mut play_writer : PlayWriter?
+  // private fields
 }
 pub fn[T : @object.IntoObject] Scene::add(Self, T) -> ObjectId
+pub fn Scene::add_fixed_in_frame(Self, ObjectId) -> Unit raise SceneError
+pub fn Scene::add_fixed_orientation(Self, ObjectId, use_static_center_func? : Bool, center_func? : () -> @object.Vec3) -> Unit raise SceneError
 pub fn[T : @object.IntoObject] Scene::add_foreground(Self, T) -> ObjectId
+pub fn Scene::camera(Self) -> @camera.Camera
+pub fn Scene::camera_space(Self, ObjectId) -> @camera.CameraSpace raise SceneError
 pub fn Scene::children(Self, ObjectId) -> Array[ObjectId] raise SceneError
 pub fn Scene::clear(Self) -> Unit
 pub fn[T : IntoAnimation] Scene::compile_play_plan(Self, Array[T], config? : PlayConfig) -> PlayPlan raise SceneError
@@ -221,16 +232,23 @@ pub fn Scene::family(Self, ObjectId) -> Array[ObjectId] raise SceneError
 pub fn Scene::foreground_objects(Self) -> Array[ObjectId]
 pub fn Scene::get(Self, ObjectId) -> @object.Object?
 pub fn Scene::is_visible(Self, ObjectId) -> Bool
-pub fn Scene::new(config? : SceneConfig) -> Self
+pub fn Scene::move_camera(Self, frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Unit raise SceneError
+pub fn Scene::new(config? : SceneConfig, camera? : @camera.Camera) -> Self
 pub fn[T : @object.IntoObject] Scene::object(Self, T) -> ObjectId
 pub fn Scene::object_count(Self) -> Int
+pub fn Scene::orbit_camera(Self, phi_delta? : Double, theta_delta? : Double, gamma_delta? : Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Unit raise SceneError
 pub fn Scene::parent(Self, ObjectId) -> ObjectId? raise SceneError
 pub fn[T : IntoAnimation] Scene::play(Self, Array[T]) -> Unit raise SceneError
 pub fn Scene::play_immediate(Self, Array[Animation], config? : PlayConfig) -> Unit raise SceneError
 pub fn Scene::remove(Self, ObjectId) -> Unit raise SceneError
+pub fn Scene::remove_fixed_in_frame(Self, ObjectId) -> Unit raise SceneError
+pub fn Scene::remove_fixed_orientation(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::remove_foreground(Self, ObjectId) -> Unit raise SceneError
 pub fn[T : @object.IntoObject] Scene::replace(Self, ObjectId, T) -> Unit raise SceneError
 pub fn Scene::resolve_family_path(Self, ObjectId, @object.FamilyPath) -> ObjectId raise SceneError
+pub fn Scene::set_camera(Self, @camera.Camera) -> Unit raise SceneError
+pub fn Scene::set_camera_orientation(Self, frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double) -> Unit raise SceneError
+pub fn Scene::set_camera_projection(Self, @camera.Projection) -> Unit raise SceneError
 pub fn Scene::set_play_writer(Self, PlayWriter?) -> Unit
 pub fn Scene::show(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::show_foreground(Self, ObjectId) -> Unit raise SceneError
@@ -251,6 +269,7 @@ pub(all) struct SceneObject {
   state : ObjectState
   parent : ObjectId?
   children : Array[ObjectId]
+  // private fields
 }
 
 pub(all) struct Timing {

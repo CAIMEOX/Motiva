@@ -1,4 +1,5 @@
 import {
+  "CAIMEOX/Motiva/camera",
   "CAIMEOX/Motiva/object",
   "CAIMEOX/Motiva/render",
   "CAIMEOX/Motiva/scene",
@@ -9,8 +10,9 @@ import {
 
 supported_targets = "+native"
 
+pkgtype(kind: "executable")
+
 options(
-  "is-main": true,
   link: {
     "native": {
       "cc-link-flags": "-L/opt/homebrew/Cellar/cairo/1.18.4/lib -lcairo",

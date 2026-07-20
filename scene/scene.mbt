@@ -40,6 +40,7 @@ pub(all) struct SceneObject {
   state : ObjectState
   parent : ObjectId?
   children : Array[ObjectId]
+  priv camera_binding : CameraBinding
 }
 
 ///|
@@ -49,6 +50,8 @@ pub(all) suberror SceneError {
   NonInvertibleFamilyTransform(ObjectId)
   FamilyTopologyMismatch(ObjectId)
   ConflictingFamilyAnimations(ObjectId, ObjectId)
+  ConflictingCameraAnimations
+  Camera(@camera.CameraError)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)
@@ -68,18 +71,23 @@ pub(all) struct Scene {
   mut foreground : Array[ObjectId]
   mut time : Double
   config : SceneConfig
+  priv mut camera : @camera.Camera
   mut play_writer : PlayWriter?
 }
 
 ///|
-pub fn Scene::new(config? : SceneConfig = SceneConfig::default()) -> Scene {
+pub fn Scene::new(
+  config? : SceneConfig = SceneConfig::default(),
+  camera? : @camera.Camera = @camera.Camera::default(),
+) -> Scene {
   {
     next_id: 0,
-    objects: {},
+    objects: Map([]),
     draw_order: [],
     foreground: [],
     time: 0.0,
     config,
+    camera,
     play_writer: None,
   }
 }
