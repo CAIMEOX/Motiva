@@ -54,6 +54,26 @@ pub fn Rgba::blue() -> Rgba {
 }
 
 ///|
+pub fn Rgba::manim_blue() -> Rgba {
+  Rgba::rgb(r=88.0 / 255.0, g=196.0 / 255.0, b=221.0 / 255.0)
+}
+
+///|
+pub fn Rgba::manim_blue_d() -> Rgba {
+  Rgba::rgb(r=41.0 / 255.0, g=171.0 / 255.0, b=202.0 / 255.0)
+}
+
+///|
+pub fn Rgba::manim_blue_e() -> Rgba {
+  Rgba::rgb(r=35.0 / 255.0, g=107.0 / 255.0, b=142.0 / 255.0)
+}
+
+///|
+pub fn Rgba::light_gray() -> Rgba {
+  Rgba::rgb(r=187.0 / 255.0, g=187.0 / 255.0, b=187.0 / 255.0)
+}
+
+///|
 pub fn Rgba::yellow() -> Rgba {
   Rgba::rgb(r=1.0, g=1.0, b=0.0)
 }
@@ -99,6 +119,17 @@ pub fn ShapeStyle::stroked(
 ///|
 pub fn ShapeStyle::filled(color~ : Rgba) -> ShapeStyle {
   ShapeStyle::new(fill=color, fill_opacity=1.0, stroke=color)
+}
+
+///|
+pub fn ShapeStyle::surface(
+  fill? : Rgba = Rgba::manim_blue_d(),
+  fill_opacity? : Double = 1.0,
+  stroke? : Rgba = Rgba::light_gray(),
+  stroke_opacity? : Double = 1.0,
+  stroke_width? : Double = 0.5,
+) -> ShapeStyle {
+  ShapeStyle::new(fill~, fill_opacity~, stroke~, stroke_opacity~, stroke_width~)
 }
 
 ///|
