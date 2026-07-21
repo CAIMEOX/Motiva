@@ -9,6 +9,11 @@ import {
 pub fn[T : IntoObject] into_object(T) -> Object
 
 // Errors
+pub(all) suberror MeshError {
+  FaceHasTooFewVertices(face_index~ : Int, vertex_count~ : Int)
+  VertexIndexOutOfBounds(face_index~ : Int, vertex_index~ : Int, vertex_count~ : Int)
+}
+
 pub(all) suberror PathBufferError {
   InvalidPointCount(Int)
 }
@@ -61,6 +66,18 @@ pub fn Arrow::shaft(Self) -> Line
 pub fn Arrow::tip(Self) -> Polygon
 pub impl IntoObject for Arrow
 
+pub(all) struct Arrow3D {
+  start : Vec3
+  end : Vec3
+  thickness : Double
+  tip_height : Double
+  tip_radius : Double
+  radial_resolution : Int
+  style : ShapeStyle
+}
+pub fn Arrow3D::new(start? : Vec3, end? : Vec3, thickness? : Double, tip_height? : Double, tip_radius? : Double, radial_resolution? : Int, style? : ShapeStyle) -> Self
+pub impl IntoObject for Arrow3D
+
 pub(all) struct Axes {
   x_min : Double
   x_max : Double
@@ -94,6 +111,45 @@ pub fn Circle::path(Self) -> Path3D
 pub fn Circle::point_at_angle(Self, Double) -> Vec3
 pub impl IntoObject for Circle
 
+pub(all) struct Cone {
+  base_radius : Double
+  height : Double
+  direction : Vec3
+  show_base : Bool
+  v_min : Double
+  v_max : Double
+  u_resolution : Int
+  v_resolution : Int
+  style : ShapeStyle
+  checkerboard_colors : Array[Rgba]
+}
+pub fn Cone::new(base_radius? : Double, height? : Double, direction? : Vec3, show_base? : Bool, v_min? : Double, v_max? : Double, u_resolution? : Int, v_resolution? : Int, style? : ShapeStyle, checkerboard_colors? : Array[Rgba]) -> Self
+pub fn Cone::surface(Self) -> Surface
+pub impl IntoObject for Cone
+
+pub(all) struct Cube {
+  side_length : Double
+  style : ShapeStyle
+}
+pub fn Cube::new(side_length? : Double, style? : ShapeStyle) -> Self
+pub impl IntoObject for Cube
+
+pub(all) struct Cylinder {
+  radius : Double
+  height : Double
+  direction : Vec3
+  v_min : Double
+  v_max : Double
+  show_ends : Bool
+  u_resolution : Int
+  v_resolution : Int
+  style : ShapeStyle
+  checkerboard_colors : Array[Rgba]
+}
+pub fn Cylinder::new(radius? : Double, height? : Double, direction? : Vec3, v_min? : Double, v_max? : Double, show_ends? : Bool, u_resolution? : Int, v_resolution? : Int, style? : ShapeStyle, checkerboard_colors? : Array[Rgba]) -> Self
+pub fn Cylinder::surface(Self) -> Surface
+pub impl IntoObject for Cylinder
+
 pub(all) struct DashedLine {
   start : Vec3
   end : Vec3
@@ -105,6 +161,13 @@ pub fn DashedLine::dashes(Self) -> Array[Line]
 pub fn DashedLine::new(start? : Vec3, end? : Vec3, dash_length? : Double, dashed_ratio? : Double, style? : ShapeStyle) -> Self
 pub impl IntoObject for DashedLine
 
+pub(all) struct Dodecahedron {
+  edge_length : Double
+  style : ShapeStyle
+}
+pub fn Dodecahedron::new(edge_length? : Double, style? : ShapeStyle) -> Self
+pub impl IntoObject for Dodecahedron
+
 pub(all) struct Dot {
   point : Vec3
   radius : Double
@@ -115,6 +178,16 @@ pub fn Dot::new(point? : Vec3, radius? : Double, segments? : Int, style? : Shape
 pub fn Dot::path(Self) -> Path3D
 pub impl IntoObject for Dot
 pub impl Default for Dot
+
+pub(all) struct Dot3D {
+  point : Vec3
+  radius : Double
+  u_resolution : Int
+  v_resolution : Int
+  style : ShapeStyle
+}
+pub fn Dot3D::new(point? : Vec3, radius? : Double, u_resolution? : Int, v_resolution? : Int, style? : ShapeStyle) -> Self
+pub impl IntoObject for Dot3D
 
 pub struct FamilyPath {
   // private fields
@@ -135,6 +208,13 @@ pub fn FunctionGraph::parametric(Self) -> ParametricFunction
 pub fn FunctionGraph::path(Self) -> Path3D
 pub impl IntoObject for FunctionGraph
 
+pub(all) struct Icosahedron {
+  edge_length : Double
+  style : ShapeStyle
+}
+pub fn Icosahedron::new(edge_length? : Double, style? : ShapeStyle) -> Self
+pub impl IntoObject for Icosahedron
+
 pub(all) struct Line {
   start : Vec3
   end : Vec3
@@ -144,10 +224,44 @@ pub fn Line::new(start? : Vec3, end? : Vec3, style? : ShapeStyle) -> Self
 pub fn Line::path(Self) -> Path3D
 pub impl IntoObject for Line
 
+pub(all) struct Line3D {
+  start : Vec3
+  end : Vec3
+  thickness : Double
+  radial_resolution : Int
+  style : ShapeStyle
+}
+pub fn Line3D::direction(Self) -> Vec3
+pub fn Line3D::length(Self) -> Double
+pub fn Line3D::new(start? : Vec3, end? : Vec3, thickness? : Double, radial_resolution? : Int, style? : ShapeStyle) -> Self
+pub impl IntoObject for Line3D
+
+pub(all) struct Mesh3D {
+  vertices : Array[Vec3]
+  faces : Array[MeshFace3D]
+}
+pub fn Mesh3D::bounds(Self) -> Aabb?
+pub fn Mesh3D::face_count(Self) -> Int
+pub fn Mesh3D::face_vertices(Self, Int) -> Array[Vec3]?
+pub fn Mesh3D::is_empty(Self) -> Bool
+pub fn Mesh3D::lerp(Self, Self, Double) -> Self?
+pub fn Mesh3D::map_vertices(Self, (Vec3) -> Vec3) -> Self
+pub fn Mesh3D::new(Array[Vec3], Array[MeshFace3D]) -> Self raise MeshError
+pub fn Mesh3D::polygon(Array[Vec3]) -> Self
+pub fn Mesh3D::prefix(Self, Double) -> Self
+pub fn Mesh3D::same_topology(Self, Self) -> Bool
+pub fn Mesh3D::vertex_count(Self) -> Int
+
+pub(all) struct MeshFace3D {
+  indices : Array[Int]
+}
+pub fn MeshFace3D::new(Array[Int]) -> Self
+
 pub(all) enum Node {
   Empty
   Group(Array[Object])
   Path(Path3D, ShapeStyle)
+  Mesh(Mesh3D, ShapeStyle)
 }
 pub fn Node::bounds(Self) -> Aabb?
 
@@ -182,6 +296,7 @@ pub fn Object::center(Self) -> Vec3
 pub fn Object::critical_point(Self, Vec3) -> Vec3
 pub fn Object::empty() -> Self
 pub fn Object::group(Array[Self]) -> Self
+pub fn Object::mesh(Mesh3D, style? : ShapeStyle) -> Self
 pub fn Object::move_to(Self, Vec3, aligned_edge? : Vec3) -> Self
 pub fn Object::new(node~ : Node, transform? : Transform, z_index? : Double) -> Self
 pub fn Object::next_to(Self, Self, direction? : Vec3, buff? : Double, aligned_edge? : Vec3) -> Self
@@ -192,6 +307,13 @@ pub fn Object::set_stroke(Self, color? : Rgba, width? : Double, opacity? : Doubl
 pub fn Object::with_transform(Self, Transform) -> Self
 pub fn Object::with_z_index(Self, Double) -> Self
 pub impl IntoObject for Object
+
+pub(all) struct Octahedron {
+  edge_length : Double
+  style : ShapeStyle
+}
+pub fn Octahedron::new(edge_length? : Double, style? : ShapeStyle) -> Self
+pub impl IntoObject for Octahedron
 
 pub(all) struct ParametricFunction {
   function : (Double) -> Vec3
@@ -247,6 +369,22 @@ pub fn Polygon::new(Array[Vec3], style? : ShapeStyle) -> Self
 pub fn Polygon::path(Self) -> Path3D
 pub impl IntoObject for Polygon
 
+pub(all) struct Polyhedron {
+  vertices : Array[Vec3]
+  faces : Array[Array[Int]]
+  style : ShapeStyle
+}
+pub fn Polyhedron::face_count(Self) -> Int
+pub fn Polyhedron::new(Array[Vec3], Array[Array[Int]], style? : ShapeStyle) -> Self raise MeshError
+pub impl IntoObject for Polyhedron
+
+pub(all) struct Prism {
+  dimensions : Vec3
+  style : ShapeStyle
+}
+pub fn Prism::new(dimensions? : Vec3, style? : ShapeStyle) -> Self
+pub impl IntoObject for Prism
+
 pub(all) struct Rectangle {
   width : Double
   height : Double
@@ -267,8 +405,12 @@ pub fn Rgba::black() -> Self
 pub fn Rgba::blue() -> Self
 pub fn Rgba::cyan() -> Self
 pub fn Rgba::green() -> Self
+pub fn Rgba::light_gray() -> Self
 pub fn Rgba::lime() -> Self
 pub fn Rgba::magenta() -> Self
+pub fn Rgba::manim_blue() -> Self
+pub fn Rgba::manim_blue_d() -> Self
+pub fn Rgba::manim_blue_e() -> Self
 pub fn Rgba::new(r~ : Double, g~ : Double, b~ : Double, a~ : Double) -> Self
 pub fn Rgba::red() -> Self
 pub fn Rgba::rgb(r~ : Double, g~ : Double, b~ : Double) -> Self
@@ -289,7 +431,24 @@ pub fn ShapeStyle::set_color(Self, Rgba) -> Self
 pub fn ShapeStyle::set_fill(Self, color? : Rgba, opacity? : Double) -> Self
 pub fn ShapeStyle::set_stroke(Self, color? : Rgba, width? : Double, opacity? : Double) -> Self
 pub fn ShapeStyle::stroked(color~ : Rgba, stroke_width? : Double) -> Self
+pub fn ShapeStyle::surface(fill? : Rgba, fill_opacity? : Double, stroke? : Rgba, stroke_opacity? : Double, stroke_width? : Double) -> Self
 pub impl Default for ShapeStyle
+
+pub(all) struct Sphere {
+  center : Vec3
+  radius : Double
+  u_min : Double
+  u_max : Double
+  v_min : Double
+  v_max : Double
+  u_resolution : Int
+  v_resolution : Int
+  style : ShapeStyle
+  checkerboard_colors : Array[Rgba]
+}
+pub fn Sphere::new(center? : Vec3, radius? : Double, u_min? : Double, u_max? : Double, v_min? : Double, v_max? : Double, u_resolution? : Int, v_resolution? : Int, style? : ShapeStyle, checkerboard_colors? : Array[Rgba]) -> Self
+pub fn Sphere::surface(Self) -> Surface
+pub impl IntoObject for Sphere
 
 pub(all) struct Square {
   side_length : Double
@@ -305,6 +464,73 @@ pub(all) struct SubpathSpan {
   closed : Bool
 }
 
+pub(all) struct Surface {
+  function : (Double, Double) -> Vec3
+  u_min : Double
+  u_max : Double
+  v_min : Double
+  v_max : Double
+  u_resolution : Int
+  v_resolution : Int
+  style : ShapeStyle
+  checkerboard_colors : Array[Rgba]
+}
+pub fn Surface::new((Double, Double) -> Vec3, u_min? : Double, u_max? : Double, v_min? : Double, v_max? : Double, u_resolution? : Int, v_resolution? : Int, style? : ShapeStyle, checkerboard_colors? : Array[Rgba]) -> Self
+pub fn Surface::patch_count(Self) -> Int
+pub fn Surface::patches(Self) -> Array[Object]
+pub impl IntoObject for Surface
+
+pub(all) struct Tetrahedron {
+  edge_length : Double
+  style : ShapeStyle
+}
+pub fn Tetrahedron::new(edge_length? : Double, style? : ShapeStyle) -> Self
+pub impl IntoObject for Tetrahedron
+
+pub(all) struct ThreeDAxes {
+  x_min : Double
+  x_max : Double
+  x_step : Double
+  y_min : Double
+  y_max : Double
+  y_step : Double
+  z_min : Double
+  z_max : Double
+  z_step : Double
+  x_length : Double
+  y_length : Double
+  z_length : Double
+  tips : Bool
+  tick_size : Double
+  style : ShapeStyle
+}
+pub fn ThreeDAxes::coords_to_point(Self, Double, Double, Double) -> Vec3
+pub fn ThreeDAxes::new(x_min? : Double, x_max? : Double, x_step? : Double, y_min? : Double, y_max? : Double, y_step? : Double, z_min? : Double, z_max? : Double, z_step? : Double, x_length? : Double, y_length? : Double, z_length? : Double, tips? : Bool, tick_size? : Double, style? : ShapeStyle) -> Self
+pub fn ThreeDAxes::plot_parametric_curve(Self, (Double) -> Vec3, t_min? : Double, t_max? : Double, step? : Double, style? : ShapeStyle) -> ParametricFunction
+pub fn ThreeDAxes::plot_parametric_surface(Self, (Double, Double) -> Vec3, u_min? : Double, u_max? : Double, v_min? : Double, v_max? : Double, u_resolution? : Int, v_resolution? : Int, style? : ShapeStyle, checkerboard_colors? : Array[Rgba]) -> Surface
+pub fn ThreeDAxes::plot_surface(Self, (Double, Double) -> Double, x_min? : Double, x_max? : Double, y_min? : Double, y_max? : Double, x_resolution? : Int, y_resolution? : Int, style? : ShapeStyle, checkerboard_colors? : Array[Rgba]) -> Surface
+pub fn ThreeDAxes::point_to_coords(Self, Vec3) -> (Double, Double, Double)
+pub fn ThreeDAxes::x_axis(Self) -> NumberLine
+pub fn ThreeDAxes::y_axis(Self) -> NumberLine
+pub fn ThreeDAxes::z_axis(Self) -> NumberLine
+pub impl IntoObject for ThreeDAxes
+
+pub(all) struct Torus {
+  major_radius : Double
+  minor_radius : Double
+  u_min : Double
+  u_max : Double
+  v_min : Double
+  v_max : Double
+  u_resolution : Int
+  v_resolution : Int
+  style : ShapeStyle
+  checkerboard_colors : Array[Rgba]
+}
+pub fn Torus::new(major_radius? : Double, minor_radius? : Double, u_min? : Double, u_max? : Double, v_min? : Double, v_max? : Double, u_resolution? : Int, v_resolution? : Int, style? : ShapeStyle, checkerboard_colors? : Array[Rgba]) -> Self
+pub fn Torus::surface(Self) -> Surface
+pub impl IntoObject for Torus
+
 pub(all) struct Transform {
   m00 : Double
   m01 : Double
@@ -319,6 +545,7 @@ pub(all) struct Transform {
   m22 : Double
   m23 : Double
 }
+pub fn Transform::align_z_to(Vec3) -> Self
 pub fn Transform::apply_point(Self, Vec3) -> Vec3
 pub fn Transform::apply_vec(Self, Vec3) -> Vec3
 pub fn Transform::identity() -> Self
@@ -338,15 +565,19 @@ pub(all) struct Vec3 {
   z : Double
 }
 pub fn Vec3::add(Self, Self) -> Self
+pub fn Vec3::cross(Self, Self) -> Self
 pub fn Vec3::dot(Self, Self) -> Double
 pub fn Vec3::length(Self) -> Double
 pub fn Vec3::length_squared(Self) -> Double
+pub fn Vec3::lerp(Self, Self, Double) -> Self
 pub fn Vec3::max(Self, Self) -> Self
 pub fn Vec3::min(Self, Self) -> Self
 pub fn Vec3::new(x~ : Double, y~ : Double, z? : Double) -> Self
 pub fn Vec3::normalize_or(Self, Self) -> Self
 pub fn Vec3::scale(Self, Double) -> Self
 pub fn Vec3::sub(Self, Self) -> Self
+pub fn Vec3::unit_x() -> Self
+pub fn Vec3::unit_y() -> Self
 pub fn Vec3::unit_z() -> Self
 pub fn Vec3::zero() -> Self
 
