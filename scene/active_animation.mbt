@@ -669,7 +669,7 @@ fn sample_create_object(
 fn create_family_size(source : @object.Object) -> Int {
   match source.node {
     Empty => 0
-    Path(_, _) => 1
+    Path(_, _) | Mesh(_, _) => 1
     Group(children) =>
       children.fold(init=0, (size, child) => size + create_family_size(child))
   }
@@ -688,6 +688,10 @@ fn sample_create_family_member(
     Path(path, style) => {
       let alpha = timing.family_alpha(raw_alpha, family_index, family_size)
       (Path(sample_create_path(path, alpha), style), family_index + 1)
+    }
+    Mesh(mesh, style) => {
+      let alpha = timing.family_alpha(raw_alpha, family_index, family_size)
+      (Mesh(mesh.prefix(alpha), style), family_index + 1)
     }
     Group(children) => {
       let sampled : Array[@object.Object] = []
@@ -857,7 +861,7 @@ fn sample_draw_border_then_fill_member(
 ) -> (@object.Object, Int) {
   match (source.node, outline.node) {
     (Empty, _) => (source, family_index)
-    (Path(_, _), Path(_, _)) => {
+    (Path(_, _), Path(_, _)) | (Mesh(_, _), Mesh(_, _)) => {
       let alpha = timing.family_alpha(raw_alpha, family_index, family_size)
       let sampled = if alpha < 0.5 {
         sample_create_object(outline, alpha * 2.0, Timing::new(), 1)
@@ -933,6 +937,7 @@ fn make_outline_node(source : @object.Node) -> @object.Node {
     Empty => Empty
     Group(children) => Group(children.map(child => make_outline_object(child)))
     Path(path, style) => Path(path, make_outline_style(style))
+    Mesh(mesh, style) => Mesh(mesh, make_outline_style(style))
   }
 }
 

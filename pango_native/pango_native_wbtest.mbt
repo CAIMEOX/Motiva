@@ -89,6 +89,7 @@ fn first_text_path_style(object : @object.Object) -> @object.ShapeStyle? {
   match object.node {
     Empty => None
     Path(_, style) => Some(style)
+    Mesh(_, _) => None
     Group(children) => {
       for child in children {
         match first_text_path_style(child) {

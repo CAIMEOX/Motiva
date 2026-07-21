@@ -173,13 +173,10 @@ fn find_character_ranges(
   let ranges : Array[TextRange] = []
   let mut index = 0
   while index + pattern_chars.length() <= source_chars.length() {
-    let mut matches = true
-    for offset in 0..<pattern_chars.length() {
-      if source_chars[index + offset] != pattern_chars[offset] {
-        matches = false
-        break
-      }
-    }
+    let matches = source_chars[index:index + pattern_chars.length()]
+      .iter()
+      .zip(pattern_chars.iter())
+      .all(pair => pair.0 == pair.1)
     if matches {
       ranges.push({ start: index, end: index + pattern_chars.length() })
       index = index + pattern_chars.length()

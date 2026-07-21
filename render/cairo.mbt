@@ -42,15 +42,7 @@ fn CairoRenderer::render_surface(
   let ctx = try_cairo(() => @cairoon.Context::new(surface))
   paint_background(ctx, camera)
   set_camera_matrix(ctx, camera)
-  for item in snapshot.items {
-    draw_object(
-      ctx,
-      camera,
-      item.object,
-      item.camera_space,
-      self.cairo_line_width_multiple,
-    )
-  }
+  draw_render_items(ctx, snapshot, self.cairo_line_width_multiple)
   surface
 }
 
@@ -80,53 +72,6 @@ fn set_camera_matrix(
     y0=camera.pixel_height.to_double() / 2.0,
   )
   try_cairo(() => ctx.set_matrix(matrix))
-}
-
-///|
-fn draw_object(
-  ctx : @cairoon.Context,
-  camera : @camera.Camera,
-  object : @object.Object,
-  camera_space : @camera.CameraSpace,
-  cairo_line_width_multiple : Double,
-) -> Unit raise RenderError {
-  draw_object_with_transform(
-    ctx,
-    camera,
-    object,
-    object.transform,
-    camera_space,
-    cairo_line_width_multiple,
-  )
-}
-
-///|
-fn draw_object_with_transform(
-  ctx : @cairoon.Context,
-  camera : @camera.Camera,
-  object : @object.Object,
-  transform : @object.Transform,
-  camera_space : @camera.CameraSpace,
-  cairo_line_width_multiple : Double,
-) -> Unit raise RenderError {
-  match object.node {
-    Empty => ()
-    Group(children) =>
-      for child in children {
-        draw_object_with_transform(
-          ctx,
-          camera,
-          child,
-          child.transform.then(transform),
-          camera_space,
-          cairo_line_width_multiple,
-        )
-      }
-    Path(path, style) =>
-      draw_path(
-        ctx, camera, path, style, transform, camera_space, cairo_line_width_multiple,
-      )
-  }
 }
 
 ///|
