@@ -16,6 +16,16 @@ pub fn Vec3::zero() -> Vec3 {
 }
 
 ///|
+pub fn Vec3::unit_x() -> Vec3 {
+  { x: 1.0, y: 0.0, z: 0.0 }
+}
+
+///|
+pub fn Vec3::unit_y() -> Vec3 {
+  { x: 0.0, y: 1.0, z: 0.0 }
+}
+
+///|
 pub fn Vec3::unit_z() -> Vec3 {
   { x: 0.0, y: 0.0, z: 1.0 }
 }
@@ -38,6 +48,20 @@ pub fn Vec3::scale(self : Vec3, factor : Double) -> Vec3 {
 ///|
 pub fn Vec3::dot(self : Vec3, other : Vec3) -> Double {
   self.x * other.x + self.y * other.y + self.z * other.z
+}
+
+///|
+pub fn Vec3::cross(self : Vec3, other : Vec3) -> Vec3 {
+  {
+    x: self.y * other.z - self.z * other.y,
+    y: self.z * other.x - self.x * other.z,
+    z: self.x * other.y - self.y * other.x,
+  }
+}
+
+///|
+pub fn Vec3::lerp(self : Vec3, other : Vec3, alpha : Double) -> Vec3 {
+  self.add(other.sub(self).scale(alpha))
 }
 
 ///|
@@ -366,6 +390,28 @@ pub fn Transform::rotate_axis(angle~ : Double, axis~ : Vec3) -> Transform {
     m21: unit.z * unit.y * t + unit.x * s,
     m22: c + unit.z * unit.z * t,
     m23: 0.0,
+  }
+}
+
+///|
+pub fn Transform::align_z_to(direction : Vec3) -> Transform {
+  let target = direction.normalize_or(Vec3::unit_z())
+  let cosine = if target.z < -1.0 {
+    -1.0
+  } else if target.z > 1.0 {
+    1.0
+  } else {
+    target.z
+  }
+  if cosine > 0.999999999999 {
+    Transform::identity()
+  } else if cosine < -0.999999999999 {
+    Transform::rotate_x(angle=@math.PI)
+  } else {
+    Transform::rotate_axis(
+      angle=@math.acos(cosine),
+      axis=Vec3::unit_z().cross(target),
+    )
   }
 }
 

@@ -126,6 +126,7 @@ fn tint_existing_paints(
         }),
       )
     Path(path, style) => Path(path, tint_style(style, fill_color, stroke_color))
+    Mesh(mesh, style) => Mesh(mesh, tint_style(style, fill_color, stroke_color))
   }
   { ..object, node, }
 }

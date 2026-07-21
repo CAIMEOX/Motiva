@@ -51,8 +51,12 @@ You can browse and install extra skills here:
   deduplication, correlated output buffers, or other mutable state, use an
   explicit `for` loop with clearly named builders.
 
-- Use `any`, `all`, and `contains` for boolean membership reductions instead of
-  spelling them as `fold`.
+- Use `any`, `all`, and `contains` for boolean quantification and membership.
+  Do not introduce a mutable boolean sentinel, flip it inside a loop, `break`,
+  and then return it when the loop only answers a collection predicate. Use a
+  search operation when the matching value or index is needed. An explicit
+  mutable boolean remains appropriate when it is genuine state carried across
+  parser, interpreter, or state-machine iterations rather than a reduction.
 
 - Use `each` for a simple ordered side effect with no index, accumulator,
   `break`, or `continue`. Use `for` for interpreters, mutable builders, early

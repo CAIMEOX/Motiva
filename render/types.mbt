@@ -97,12 +97,15 @@ fn push_family_items(
       !rendered_ids.contains(id) {
       match scene.get(id) {
         None => raise MissingObject(id)
-        Some({ node: Path(_, _), .. } as object) => {
-          let camera_space = try_scene(() => scene.camera_space(id))
-          push_z_sorted(items, { id, object, layer, camera_space })
-          rendered_ids.add(id)
-        }
-        Some(_) => ()
+        Some(object) =>
+          match object.node {
+            Path(_, _) | Mesh(_, _) => {
+              let camera_space = try_scene(() => scene.camera_space(id))
+              push_z_sorted(items, { id, object, layer, camera_space })
+              rendered_ids.add(id)
+            }
+            _ => ()
+          }
       }
     }
   }

@@ -75,6 +75,7 @@ fn copy_object(object : @object.Object) -> @object.Object {
       let path_copy : @object.Path3D = { commands: path.commands.copy() }
       Path(path_copy, style)
     }
+    Mesh(mesh, style) => Mesh(mesh.map_vertices(point => point), style)
   }
   { ..object, node, }
 }
@@ -89,6 +90,7 @@ fn apply_override_style(
     Group(children) =>
       Group(children.map(child => apply_override_style(child, style)))
     Path(path, _) => Path(path, style)
+    Mesh(mesh, _) => Mesh(mesh, style)
   }
   { ..object, node, }
 }

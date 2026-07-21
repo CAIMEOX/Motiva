@@ -3,6 +3,7 @@ fn path_count(object : @object.Object) -> Int {
   match object.node {
     Empty => 0
     Path(_, _) => 1
+    Mesh(_, _) => 0
     Group(children) =>
       children.fold(init=0, (count, child) => count + path_count(child))
   }
@@ -16,6 +17,7 @@ fn collect_paths(
   match object.node {
     Empty => ()
     Path(_, _) => paths.push(object)
+    Mesh(_, _) => ()
     Group(children) =>
       for child in children {
         collect_paths(child, paths)

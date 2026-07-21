@@ -24,7 +24,7 @@ keywords = [ "animation", "manim", "graphics", "timeline" ]
 description = "A MoonBit animation engine inspired by Manim."
 
 import {
-  "CAIMEOX/cairoon@0.1.0",
+  "CAIMEOX/cairoon@0.2.0",
   "moonbitlang/async@0.19.1",
   "moonbit-community/XMLParser@0.2.5",
 }

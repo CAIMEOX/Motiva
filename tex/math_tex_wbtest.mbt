@@ -57,6 +57,7 @@ fn first_path_style(object : @object.Object) -> @object.ShapeStyle? {
   match object.node {
     Empty => None
     Path(_, style) => Some(style)
+    Mesh(_, _) => None
     Group(children) => children.iter().filter_map(first_path_style).next()
   }
 }

@@ -25,6 +25,12 @@ fn interpolate_node(
         interpolate_path(start_path, target_path, alpha),
         interpolate_shape_style(start_style, target_style, alpha),
       )
+    (Mesh(start_mesh, start_style), Mesh(target_mesh, target_style)) =>
+      start_mesh
+      .lerp(target_mesh, alpha)
+      .map_or(choose_endpoint(start, target, alpha), mesh => {
+        Mesh(mesh, interpolate_shape_style(start_style, target_style, alpha))
+      })
     (Group(start_children), Group(target_children)) =>
       Group(interpolate_children(start_children, target_children, alpha))
     _ => choose_endpoint(start, target, alpha)

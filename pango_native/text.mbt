@@ -458,6 +458,13 @@ fn apply_presentation(
         stroke_width,
       })
     }
+    Mesh(mesh, style) =>
+      Mesh(mesh, {
+        ..style,
+        fill_opacity: style.fill_opacity * fill_opacity,
+        stroke_opacity: style.stroke_opacity * fill_opacity,
+        stroke_width,
+      })
   }
   { ..object, node, }
 }

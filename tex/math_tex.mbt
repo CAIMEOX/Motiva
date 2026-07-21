@@ -189,6 +189,13 @@ fn recolor_default_tex(
         stroke: replace_black(style.stroke, replacement),
         stroke_width: 0.0,
       })
+    Mesh(mesh, style) =>
+      Mesh(mesh, {
+        ..style,
+        fill: replace_black(style.fill, replacement),
+        stroke: replace_black(style.stroke, replacement),
+        stroke_width: 0.0,
+      })
   }
   { ..object, node, }
 }

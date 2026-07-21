@@ -10,6 +10,7 @@ pub(all) enum Node {
   Empty
   Group(Array[Object])
   Path(Path3D, ShapeStyle)
+  Mesh(Mesh3D, ShapeStyle)
 }
 
 ///|
@@ -37,6 +38,14 @@ pub fn Object::path(
   style? : ShapeStyle = ShapeStyle::default(),
 ) -> Object {
   Object::new(node=Path(path, style))
+}
+
+///|
+pub fn Object::mesh(
+  mesh : Mesh3D,
+  style? : ShapeStyle = ShapeStyle::default(),
+) -> Object {
+  Object::new(node=Mesh(mesh, style))
 }
 
 ///|
@@ -109,6 +118,7 @@ pub fn Node::bounds(self : Node) -> Aabb? {
   match self {
     Empty => None
     Path(path, _) => path.bounds()
+    Mesh(mesh, _) => mesh.bounds()
     Group(children) =>
       children.fold(init=None, (bounds : Aabb?, child) => {
         merge_bounds(bounds, child.bounds())
@@ -130,6 +140,7 @@ fn Node::set_fill(self : Node, color? : Rgba, opacity? : Double) -> Node {
   match self {
     Empty => Empty
     Path(path, style) => Path(path, style.set_fill(color?, opacity?))
+    Mesh(mesh, style) => Mesh(mesh, style.set_fill(color?, opacity?))
     Group(children) =>
       Group(children.map(child => child.set_fill(color?, opacity?)))
   }
@@ -145,6 +156,7 @@ fn Node::set_stroke(
   match self {
     Empty => Empty
     Path(path, style) => Path(path, style.set_stroke(color?, width?, opacity?))
+    Mesh(mesh, style) => Mesh(mesh, style.set_stroke(color?, width?, opacity?))
     Group(children) =>
       Group(children.map(child => child.set_stroke(color?, width?, opacity?)))
   }
@@ -155,6 +167,7 @@ fn Node::set_color(self : Node, color : Rgba) -> Node {
   match self {
     Empty => Empty
     Path(path, style) => Path(path, style.set_color(color))
+    Mesh(mesh, style) => Mesh(mesh, style.set_color(color))
     Group(children) => Group(children.map(child => child.set_color(color)))
   }
 }
