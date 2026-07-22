@@ -22,6 +22,7 @@ priv struct ReplacementFinish {
 priv enum ActiveAnimationKind {
   ActiveWait
   ActiveCamera(start~ : @camera.Camera, target~ : @camera.Camera)
+  ActiveValue(ValueTracker, start~ : Double, target~ : Double)
   ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
   ActiveScale(ObjectId, start~ : @object.Object, spec~ : ScaleSpec)
   ActiveRotate(ObjectId, start~ : @object.Object, spec~ : RotationSpec)
@@ -45,6 +46,7 @@ priv struct ActiveAnimation {
   timing : Timing
   run_time : Double
   lifecycle : AnimationLifecycle
+  suspend_updaters : Bool
 }
 
 ///|
@@ -70,7 +72,7 @@ fn ActiveAnimation::compile(
   scene : Scene,
   animation : Animation,
 ) -> ActiveAnimation raise SceneError {
-  match animation.kind {
+  let active = match animation.kind {
     Wait => ActiveAnimation::wait(animation.timing)
     MoveCamera(motion) => {
       let start = scene.camera()
@@ -132,6 +134,22 @@ fn ActiveAnimation::compile(
         spec~,
         timing=animation.timing,
       )
+    SetValue(tracker, value) =>
+      ActiveAnimation::value(
+        tracker,
+        start=scene.value(tracker),
+        target=value,
+        timing=animation.timing,
+      )
+    IncrementValue(tracker, delta) => {
+      let start = scene.value(tracker)
+      ActiveAnimation::value(
+        tracker,
+        start~,
+        target=start + delta,
+        timing=animation.timing,
+      )
+    }
     Transform(id, target) => {
       let start = scene.require_materialized_object(id)
       scene.validate_replacement_topology(id, target)
@@ -154,6 +172,7 @@ fn ActiveAnimation::compile(
       })
     }
   }
+  { ..active, suspend_updaters: animation.suspend_updaters }
 }
 
 ///|
@@ -171,6 +190,27 @@ fn ActiveAnimation::camera(
       remover=false,
       has_frame_effect=true,
     ),
+    suspend_updaters: true,
+  }
+}
+
+///|
+fn ActiveAnimation::value(
+  tracker : ValueTracker,
+  start~ : Double,
+  target~ : Double,
+  timing~ : Timing,
+) -> ActiveAnimation {
+  {
+    kind: ActiveValue(tracker, start~, target~),
+    timing,
+    run_time: timing.resolve_run_time(1.0),
+    lifecycle: AnimationLifecycle::new(
+      introducer=false,
+      remover=false,
+      has_frame_effect=true,
+    ),
+    suspend_updaters: true,
   }
 }
 
@@ -181,6 +221,7 @@ fn ActiveAnimation::wait(timing : Timing) -> ActiveAnimation {
     timing,
     run_time: timing.resolve_run_time(1.0),
     lifecycle: AnimationLifecycle::passive(),
+    suspend_updaters: true,
   }
 }
 
@@ -217,6 +258,7 @@ fn ActiveAnimation::transform_with_lifecycle(
     timing,
     run_time: timing.resolve_run_time(1.0),
     lifecycle,
+    suspend_updaters: true,
   }
 }
 
@@ -236,6 +278,7 @@ fn ActiveAnimation::scale(
       remover=false,
       has_frame_effect=true,
     ),
+    suspend_updaters: true,
   }
 }
 
@@ -255,6 +298,7 @@ fn ActiveAnimation::rotate(
       remover=false,
       has_frame_effect=true,
     ),
+    suspend_updaters: true,
   }
 }
 
@@ -273,6 +317,7 @@ fn ActiveAnimation::reveal(
       remover=false,
       has_frame_effect=true,
     ),
+    suspend_updaters: true,
   }
 }
 
@@ -338,6 +383,7 @@ fn ActiveAnimation::draw_border_then_fill(
       remover=false,
       has_frame_effect=true,
     ),
+    suspend_updaters: true,
   }
 }
 
@@ -351,7 +397,7 @@ fn ActiveAnimation::group(
   let children = animations.map(animation => {
     ActiveAnimation::compile(scene, animation)
   })
-  validate_family_animation_targets(scene, children)
+  validate_animation_targets(scene, children)
   let scheduled = schedule_group_children(children, timing.lag_ratio)
   let natural_run_time = scheduled.fold(init=0.0, (duration, child) => {
     if child.end_time > duration {
@@ -365,11 +411,12 @@ fn ActiveAnimation::group(
     timing,
     run_time: timing.resolve_run_time(natural_run_time),
     lifecycle: group_lifecycle(scheduled, replacement),
+    suspend_updaters: true,
   }
 }
 
 ///|
-fn validate_family_animation_targets(
+fn validate_animation_targets(
   scene : Scene,
   animations : Array[ActiveAnimation],
 ) -> Unit raise SceneError {
@@ -381,6 +428,13 @@ fn validate_family_animation_targets(
       }
       if first_animation.affects_camera() && second_animation.affects_camera() {
         raise ConflictingCameraAnimations
+      }
+      for first in first_animation.affected_values() {
+        for second in second_animation.affected_values() {
+          if first == second {
+            raise ConflictingValueAnimations(first)
+          }
+        }
       }
       for first in first_animation.affected_ids() {
         for second in second_animation.affected_ids() {
@@ -441,7 +495,7 @@ fn ActiveAnimation::run_time(self : ActiveAnimation) -> Double {
 ///|
 fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
   match self.kind {
-    ActiveWait | ActiveCamera(..) => []
+    ActiveWait | ActiveCamera(..) | ActiveValue(_, ..) => []
     ActiveTransform(id, ..)
     | ActiveScale(id, ..)
     | ActiveRotate(id, ..)
@@ -465,6 +519,21 @@ fn ActiveAnimation::affected_ids(self : ActiveAnimation) -> Array[ObjectId] {
 }
 
 ///|
+fn ActiveAnimation::affected_values(
+  self : ActiveAnimation,
+) -> Array[ValueTracker] {
+  match self.kind {
+    ActiveValue(tracker, ..) => [tracker]
+    ActiveGroup(children, ..) =>
+      children
+      .iter()
+      .flat_map(child => child.animation.affected_values().iter())
+      .to_array()
+    _ => []
+  }
+}
+
+///|
 fn ActiveAnimation::affects_camera(self : ActiveAnimation) -> Bool {
   match self.kind {
     ActiveCamera(..) => true
@@ -475,11 +544,41 @@ fn ActiveAnimation::affects_camera(self : ActiveAnimation) -> Bool {
 }
 
 ///|
+fn ActiveAnimation::suspended_targets(
+  self : ActiveAnimation,
+  scene : Scene,
+) -> Array[UpdateTarget] raise SceneError {
+  if !self.suspend_updaters {
+    []
+  } else {
+    match self.kind {
+      ActiveWait => []
+      ActiveCamera(..) => [CameraTarget]
+      ActiveValue(tracker, ..) => [ValueTarget(tracker)]
+      ActiveTransform(id, ..)
+      | ActiveScale(id, ..)
+      | ActiveRotate(id, ..)
+      | ActiveReveal(id, ..)
+      | ActiveDrawBorderThenFill(id, ..) =>
+        scene.family(id).map(id => ObjectTarget(id))
+      ActiveGroup(children, ..) => {
+        let targets : Array[UpdateTarget] = []
+        for child in children {
+          targets.append(child.animation.suspended_targets(scene))
+        }
+        targets
+      }
+    }
+  }
+}
+
+///|
 fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
   let _ = self.lifecycle.introducer
   match self.kind {
     ActiveWait => FramePatch::empty()
     ActiveCamera(start~, ..) => FramePatch::set_camera(start)
+    ActiveValue(tracker, start~, ..) => FramePatch::set_value(tracker, start)
     ActiveTransform(id, start~, ..) =>
       FramePatch::all([
         FramePatch::put(id, start),
@@ -536,6 +635,8 @@ fn ActiveAnimation::sample(
       ActiveWait => FramePatch::empty()
       ActiveCamera(start~, target~) =>
         FramePatch::set_camera(start.interpolate(target, alpha))
+      ActiveValue(tracker, start~, target~) =>
+        FramePatch::set_value(tracker, lerp_double(start, target, alpha))
       ActiveTransform(id, start~, target~) =>
         FramePatch::all([
           FramePatch::put(id, interpolate_object(start, target, alpha)),

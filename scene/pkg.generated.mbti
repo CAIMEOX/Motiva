@@ -12,15 +12,18 @@ pub fn[T : IntoAnimation] into_animation(T) -> Animation
 // Errors
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  UnknownValueTracker(ValueTracker)
   UnknownFamilyPath(ObjectId, @object.FamilyPath)
   NonInvertibleFamilyTransform(ObjectId)
   FamilyTopologyMismatch(ObjectId)
   ConflictingFamilyAnimations(ObjectId, ObjectId)
+  ConflictingValueAnimations(ValueTracker)
   ConflictingCameraAnimations
   Camera(@camera.CameraError)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)
+  InvalidDeltaTime(Double)
   PlayWriteFailed(Error)
 }
 
@@ -28,6 +31,7 @@ pub(all) suberror SceneError {
 pub(all) struct Animation {
   kind : AnimationKind
   timing : Timing
+  suspend_updaters : Bool
 }
 pub fn Animation::apply_ops(ObjectId, Array[ObjectOp], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::create(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
@@ -35,18 +39,21 @@ pub fn Animation::draw_border_then_fill(ObjectId, run_time? : Double, rate_func?
 pub fn Animation::fade_in(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
 pub fn Animation::fade_out(ObjectId, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, shift? : @object.Vec3, target_position? : @object.Vec3, scale? : Double) -> Self
 pub fn[T : IntoAnimation] Animation::group(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
+pub fn Animation::increment_value(ValueTracker, Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn[T : IntoAnimation] Animation::lagged_start(Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::move_camera(frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
-pub fn Animation::new(AnimationKind, timing? : Timing) -> Self
+pub fn Animation::new(AnimationKind, timing? : Timing, suspend_updaters? : Bool) -> Self
 pub fn Animation::orbit_camera(phi_delta? : Double, theta_delta? : Double, gamma_delta? : Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn[T : IntoAnimation] Animation::replacement(source~ : ObjectId, target~ : ObjectId, Array[T], run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double) -> Self
 pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::scale(ObjectId, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn Animation::set_value(ValueTracker, Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::wait(Double) -> Self
 pub fn Animation::with_lag_ratio(Self, Double) -> Self
 pub fn Animation::with_rate_func(Self, RateFunc) -> Self
 pub fn Animation::with_run_time(Self, Double) -> Self
+pub fn Animation::with_updater_suspension(Self, Bool) -> Self
 pub fn Animation::write(ObjectId, run_time? : Double, lag_ratio? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub impl IntoAnimation for Animation
 
@@ -54,6 +61,7 @@ pub(all) struct AnimationBuilder {
   id : ObjectId
   ops : Array[ObjectOp]
   timing : Timing
+  suspend_updaters : Bool
 }
 pub fn AnimationBuilder::move_to(Self, @object.Vec3) -> Self
 pub fn AnimationBuilder::rotate(Self, angle~ : Double) -> Self
@@ -72,6 +80,7 @@ pub fn AnimationBuilder::target(Self, @object.Object) -> @object.Object
 pub fn AnimationBuilder::to_animation(Self) -> Animation
 pub fn AnimationBuilder::with_rate_func(Self, RateFunc) -> Self
 pub fn AnimationBuilder::with_run_time(Self, Double) -> Self
+pub fn AnimationBuilder::with_updater_suspension(Self, Bool) -> Self
 pub impl IntoAnimation for AnimationBuilder
 
 pub(all) struct AnimationGroup {
@@ -89,6 +98,8 @@ pub(all) enum AnimationKind {
   Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId, FadeSpec)
   FadeOut(ObjectId, FadeSpec)
+  SetValue(ValueTracker, Double)
+  IncrementValue(ValueTracker, Double)
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
@@ -223,14 +234,22 @@ pub fn[T : @object.IntoObject] Scene::add(Self, T) -> ObjectId
 pub fn Scene::add_fixed_in_frame(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::add_fixed_orientation(Self, ObjectId, use_static_center_func? : Bool, center_func? : () -> @object.Vec3) -> Unit raise SceneError
 pub fn[T : @object.IntoObject] Scene::add_foreground(Self, T) -> ObjectId
+pub fn Scene::add_updater(Self, Updater, call_now? : Bool) -> UpdaterId raise SceneError
+pub fn Scene::advance(Self, Double) -> Unit raise SceneError
+pub fn[T : @object.IntoObject] Scene::always_redraw(Self, (UpdateContext) -> T raise SceneError) -> ObjectId raise SceneError
 pub fn Scene::camera(Self) -> @camera.Camera
 pub fn Scene::camera_space(Self, ObjectId) -> @camera.CameraSpace raise SceneError
 pub fn Scene::children(Self, ObjectId) -> Array[ObjectId] raise SceneError
 pub fn Scene::clear(Self) -> Unit
+pub fn Scene::clear_camera_updaters(Self) -> Unit
+pub fn Scene::clear_object_updaters(Self, ObjectId, recursive? : Bool) -> Unit raise SceneError
+pub fn Scene::clear_updaters(Self) -> Unit
+pub fn Scene::clear_value_updaters(Self, ValueTracker) -> Unit raise SceneError
 pub fn[T : IntoAnimation] Scene::compile_play_plan(Self, Array[T], config? : PlayConfig) -> PlayPlan raise SceneError
 pub fn Scene::family(Self, ObjectId) -> Array[ObjectId] raise SceneError
 pub fn Scene::foreground_objects(Self) -> Array[ObjectId]
 pub fn Scene::get(Self, ObjectId) -> @object.Object?
+pub fn Scene::increment_value(Self, ValueTracker, Double) -> Unit raise SceneError
 pub fn Scene::is_visible(Self, ObjectId) -> Bool
 pub fn Scene::move_camera(Self, frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Unit raise SceneError
 pub fn Scene::new(config? : SceneConfig, camera? : @camera.Camera) -> Self
@@ -244,16 +263,27 @@ pub fn Scene::remove(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::remove_fixed_in_frame(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::remove_fixed_orientation(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::remove_foreground(Self, ObjectId) -> Unit raise SceneError
+pub fn Scene::remove_updater(Self, UpdaterId) -> Bool
 pub fn[T : @object.IntoObject] Scene::replace(Self, ObjectId, T) -> Unit raise SceneError
 pub fn Scene::resolve_family_path(Self, ObjectId, @object.FamilyPath) -> ObjectId raise SceneError
+pub fn Scene::resume_camera_updating(Self) -> Unit raise SceneError
+pub fn Scene::resume_updating(Self, ObjectId, recursive? : Bool) -> Unit raise SceneError
+pub fn Scene::resume_value_updating(Self, ValueTracker) -> Unit raise SceneError
 pub fn Scene::set_camera(Self, @camera.Camera) -> Unit raise SceneError
 pub fn Scene::set_camera_orientation(Self, frame_center? : @object.Vec3, phi? : Double, theta? : Double, gamma? : Double, zoom? : Double, focal_distance? : Double) -> Unit raise SceneError
 pub fn Scene::set_camera_projection(Self, @camera.Projection) -> Unit raise SceneError
 pub fn Scene::set_play_writer(Self, PlayWriter?) -> Unit
+pub fn Scene::set_value(Self, ValueTracker, Double) -> Unit raise SceneError
 pub fn Scene::show(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::show_foreground(Self, ObjectId) -> Unit raise SceneError
 pub fn Scene::state(Self, ObjectId) -> ObjectState?
+pub fn Scene::suspend_camera_updating(Self) -> Unit
+pub fn Scene::suspend_updating(Self, ObjectId, recursive? : Bool) -> Unit raise SceneError
+pub fn Scene::suspend_value_updating(Self, ValueTracker) -> Unit raise SceneError
 pub fn Scene::time(Self) -> Double
+pub fn Scene::updater_count(Self) -> Int
+pub fn Scene::value(Self, ValueTracker) -> Double raise SceneError
+pub fn Scene::value_tracker(Self, Double) -> ValueTracker
 pub fn Scene::visible_count(Self) -> Int
 pub fn Scene::visible_objects(Self) -> Array[ObjectId]
 
@@ -287,6 +317,35 @@ pub fn Timing::with_auto_run_time(Self) -> Self
 pub fn Timing::with_lag_ratio(Self, Double) -> Self
 pub fn Timing::with_rate_func(Self, RateFunc) -> Self
 pub fn Timing::with_run_time(Self, Double) -> Self
+
+pub struct UpdateContext {
+  // private fields
+}
+pub fn UpdateContext::camera(Self) -> @camera.Camera
+pub fn UpdateContext::dt(Self) -> Double
+pub fn UpdateContext::object(Self, ObjectId) -> @object.Object raise SceneError
+pub fn UpdateContext::time(Self) -> Double
+pub fn UpdateContext::value(Self, ValueTracker) -> Double raise SceneError
+
+pub struct Updater {
+  // private fields
+}
+pub fn Updater::camera((@camera.Camera, UpdateContext) -> @camera.Camera raise SceneError) -> Self
+pub fn Updater::object(ObjectId, (@object.Object, UpdateContext) -> @object.Object raise SceneError) -> Self
+pub fn Updater::redraw(ObjectId, (UpdateContext) -> @object.Object raise SceneError) -> Self
+pub fn Updater::value(ValueTracker, (Double, UpdateContext) -> Double raise SceneError) -> Self
+
+pub struct UpdaterId {
+  // private fields
+} derive(Eq, Hash)
+pub fn UpdaterId::value(Self) -> Int
+
+pub struct ValueTracker {
+  // private fields
+} derive(Eq, Hash)
+pub fn ValueTracker::animate_by(Self, Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Animation
+pub fn ValueTracker::animate_to(Self, Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Animation
+pub fn ValueTracker::id(Self) -> Int
 
 // Type aliases
 

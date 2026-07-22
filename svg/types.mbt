@@ -58,7 +58,7 @@ pub fn SvgObject::copy(self : SvgObject) -> SvgObject {
 fn copy_group_index(
   groups : Map[String, Array[@object.FamilyPath]],
 ) -> Map[String, Array[@object.FamilyPath]] {
-  let copied : Map[String, Array[@object.FamilyPath]] = {}
+  let copied : Map[String, Array[@object.FamilyPath]] = Map([])
   for entry in groups {
     let (id, paths) = entry
     copied[id] = paths.copy()

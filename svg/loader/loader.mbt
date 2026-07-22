@@ -21,7 +21,7 @@ pub struct SvgLoader {
 
 ///|
 pub fn SvgLoader::new() -> SvgLoader {
-  { cache: {} }
+  { cache: Map([]) }
 }
 
 ///|

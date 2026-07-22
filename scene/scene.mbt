@@ -40,21 +40,25 @@ pub(all) struct SceneObject {
   state : ObjectState
   parent : ObjectId?
   children : Array[ObjectId]
+  priv retired_children : Array[ObjectId]
   priv camera_binding : CameraBinding
 }
 
 ///|
 pub(all) suberror SceneError {
   UnknownObject(ObjectId)
+  UnknownValueTracker(ValueTracker)
   UnknownFamilyPath(ObjectId, @object.FamilyPath)
   NonInvertibleFamilyTransform(ObjectId)
   FamilyTopologyMismatch(ObjectId)
   ConflictingFamilyAnimations(ObjectId, ObjectId)
+  ConflictingValueAnimations(ValueTracker)
   ConflictingCameraAnimations
   Camera(@camera.CameraError)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)
+  InvalidDeltaTime(Double)
   PlayWriteFailed(Error)
 }
 
@@ -73,6 +77,11 @@ pub(all) struct Scene {
   config : SceneConfig
   priv mut camera : @camera.Camera
   mut play_writer : PlayWriter?
+  priv mut next_value_tracker_id : Int
+  priv value_trackers : Map[ValueTracker, Double]
+  priv mut next_updater_id : Int
+  priv mut updaters : Array[RegisteredUpdater]
+  priv updater_suspensions : Map[UpdateTarget, Int]
 }
 
 ///|
@@ -89,6 +98,11 @@ pub fn Scene::new(
     config,
     camera,
     play_writer: None,
+    next_value_tracker_id: 0,
+    value_trackers: Map([]),
+    next_updater_id: 0,
+    updaters: [],
+    updater_suspensions: Map([]),
   }
 }
 
@@ -199,7 +213,7 @@ pub fn Scene::clear(self : Scene) -> Unit {
 
 ///|
 pub fn Scene::get(self : Scene, id : ObjectId) -> @object.Object? {
-  self.materialize_object(id)
+  self.materialize_object(id).map(object => object.copy())
 }
 
 ///|

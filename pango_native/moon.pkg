@@ -1,4 +1,5 @@
 import {
+  "CAIMEOX/cairoon/native" @cairo_native,
   "CAIMEOX/Motiva/object",
   "CAIMEOX/Motiva/svg",
   "moonbitlang/core/encoding/utf8",

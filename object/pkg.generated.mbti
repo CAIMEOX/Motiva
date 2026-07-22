@@ -293,6 +293,7 @@ pub fn Object::align_to(Self, Self, direction~ : Vec3) -> Self
 pub fn Object::arrange(Self, direction? : Vec3, buff? : Double, center? : Bool, aligned_edge? : Vec3) -> Self
 pub fn Object::bounds(Self) -> Aabb?
 pub fn Object::center(Self) -> Vec3
+pub fn Object::copy(Self) -> Self
 pub fn Object::critical_point(Self, Vec3) -> Vec3
 pub fn Object::empty() -> Self
 pub fn Object::group(Array[Self]) -> Self

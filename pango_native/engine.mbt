@@ -19,6 +19,7 @@ pub struct PangoTextEngine {
 
 ///|
 pub fn PangoTextEngine::new() -> PangoTextEngine {
+  ignore(@cairo_native.native_anchor())
   { native: native_engine_new() }
 }
 

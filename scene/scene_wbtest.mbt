@@ -88,6 +88,24 @@ test "replace keeps identity and visibility" {
 }
 
 ///|
+test "scene owns geometry across add and get boundaries" {
+  let path = @object.Path3D::empty()
+  path.move_to(@object.Vec3::zero())
+  let scene = Scene::new()
+  let id = scene.add(@object.Object::path(path))
+  path.line_to(@object.Vec3::new(x=1.0, y=0.0))
+  guard scene.get(id) is Some(first) && first.node is Path(first_path, _) else {
+    fail("stored object should remain a path")
+  }
+  assert_eq(first_path.commands.length(), 1)
+  first_path.line_to(@object.Vec3::new(x=2.0, y=0.0))
+  guard scene.get(id) is Some(second) && second.node is Path(second_path, _) else {
+    fail("stored object should remain a path after reading")
+  }
+  assert_eq(second_path.commands.length(), 1)
+}
+
+///|
 test "foreground is tracked separately from draw order" {
   let scene = Scene::new()
   let square = scene.add(@object.Square::new())

@@ -394,6 +394,8 @@ pub(all) enum AnimationKind {
   Rotate(ObjectId, RotationSpec)
   FadeIn(ObjectId, FadeSpec)
   FadeOut(ObjectId, FadeSpec)
+  SetValue(ValueTracker, Double)
+  IncrementValue(ValueTracker, Double)
   Transform(ObjectId, @object.Object)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
@@ -404,6 +406,7 @@ pub(all) enum AnimationKind {
 pub(all) struct Animation {
   kind : AnimationKind
   timing : Timing
+  suspend_updaters : Bool
 }
 
 ///|
@@ -422,8 +425,9 @@ pub fn[T : IntoAnimation] AnimationGroup::new(
 pub fn Animation::new(
   kind : AnimationKind,
   timing? : Timing = Timing::new(),
+  suspend_updaters? : Bool = true,
 ) -> Animation {
-  { kind, timing }
+  { kind, timing, suspend_updaters }
 }
 
 ///|
@@ -666,6 +670,68 @@ pub fn Animation::fade_out(
 }
 
 ///|
+pub fn Animation::set_value(
+  tracker : ValueTracker,
+  value : Double,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::new(
+    SetValue(tracker, value),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
+}
+
+///|
+pub fn Animation::increment_value(
+  tracker : ValueTracker,
+  delta : Double,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::new(
+    IncrementValue(tracker, delta),
+    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+  )
+}
+
+///|
+pub fn ValueTracker::animate_to(
+  self : ValueTracker,
+  value : Double,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::set_value(
+    self,
+    value,
+    run_time~,
+    rate_func~,
+    reverse_rate_function~,
+  )
+}
+
+///|
+pub fn ValueTracker::animate_by(
+  self : ValueTracker,
+  delta : Double,
+  run_time? : Double = 1.0,
+  rate_func? : RateFunc = Linear,
+  reverse_rate_function? : Bool = false,
+) -> Animation {
+  Animation::increment_value(
+    self,
+    delta,
+    run_time~,
+    rate_func~,
+    reverse_rate_function~,
+  )
+}
+
+///|
 pub fn[T : @object.IntoObject] Animation::transform(
   id : ObjectId,
   target : T,
@@ -698,7 +764,7 @@ pub fn Animation::with_run_time(
   self : Animation,
   run_time : Double,
 ) -> Animation {
-  { kind: self.kind, timing: self.timing.with_run_time(run_time) }
+  { ..self, timing: self.timing.with_run_time(run_time) }
 }
 
 ///|
@@ -706,7 +772,7 @@ pub fn Animation::with_rate_func(
   self : Animation,
   rate_func : RateFunc,
 ) -> Animation {
-  { kind: self.kind, timing: self.timing.with_rate_func(rate_func) }
+  { ..self, timing: self.timing.with_rate_func(rate_func) }
 }
 
 ///|
@@ -714,7 +780,34 @@ pub fn Animation::with_lag_ratio(
   self : Animation,
   lag_ratio : Double,
 ) -> Animation {
-  { kind: self.kind, timing: self.timing.with_lag_ratio(lag_ratio) }
+  { ..self, timing: self.timing.with_lag_ratio(lag_ratio) }
+}
+
+///|
+pub fn Animation::with_updater_suspension(
+  self : Animation,
+  suspend_updaters : Bool,
+) -> Animation {
+  let kind = match self.kind {
+    Group(group) =>
+      Group({
+        animations: group.animations.map(animation => {
+          animation.with_updater_suspension(suspend_updaters)
+        }),
+      })
+    Replacement(group, source~, target~) =>
+      Replacement(
+        {
+          animations: group.animations.map(animation => {
+            animation.with_updater_suspension(suspend_updaters)
+          }),
+        },
+        source~,
+        target~,
+      )
+    kind => kind
+  }
+  { kind, timing: self.timing, suspend_updaters }
 }
 
 ///|
@@ -737,6 +830,7 @@ pub(all) struct AnimationBuilder {
   id : ObjectId
   ops : Array[ObjectOp]
   timing : Timing
+  suspend_updaters : Bool
 }
 
 ///|
@@ -750,6 +844,7 @@ pub fn ObjectId::animate(
     id: self,
     ops: [],
     timing: Timing::new(run_time~, rate_func~, reverse_rate_function~),
+    suspend_updaters: true,
   }
 }
 
@@ -762,6 +857,7 @@ pub fn AnimationBuilder::with_run_time(
     id: self.id,
     ops: self.ops.copy(),
     timing: self.timing.with_run_time(run_time),
+    suspend_updaters: self.suspend_updaters,
   }
 }
 
@@ -774,7 +870,16 @@ pub fn AnimationBuilder::with_rate_func(
     id: self.id,
     ops: self.ops.copy(),
     timing: self.timing.with_rate_func(rate_func),
+    suspend_updaters: self.suspend_updaters,
   }
+}
+
+///|
+pub fn AnimationBuilder::with_updater_suspension(
+  self : AnimationBuilder,
+  suspend_updaters : Bool,
+) -> AnimationBuilder {
+  { ..self, ops: self.ops.copy(), suspend_updaters }
 }
 
 ///|
@@ -898,7 +1003,11 @@ pub fn AnimationBuilder::target(
 
 ///|
 pub fn AnimationBuilder::to_animation(self : AnimationBuilder) -> Animation {
-  Animation::new(ApplyOps(self.id, self.ops.copy()), timing=self.timing)
+  Animation::new(
+    ApplyOps(self.id, self.ops.copy()),
+    timing=self.timing,
+    suspend_updaters=self.suspend_updaters,
+  )
 }
 
 ///|
@@ -913,5 +1022,10 @@ fn AnimationBuilder::with_op(
 ) -> AnimationBuilder {
   let ops = self.ops.copy()
   ops.push(op)
-  { id: self.id, ops, timing: self.timing }
+  {
+    id: self.id,
+    ops,
+    timing: self.timing,
+    suspend_updaters: self.suspend_updaters,
+  }
 }

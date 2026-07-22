@@ -49,6 +49,11 @@ pub fn Object::mesh(
 }
 
 ///|
+pub fn Object::copy(self : Object) -> Object {
+  { transform: self.transform, z_index: self.z_index, node: self.node.copy() }
+}
+
+///|
 pub fn Object::with_transform(self : Object, transform : Transform) -> Object {
   { transform, z_index: self.z_index, node: self.node }
 }
@@ -169,5 +174,15 @@ fn Node::set_color(self : Node, color : Rgba) -> Node {
     Path(path, style) => Path(path, style.set_color(color))
     Mesh(mesh, style) => Mesh(mesh, style.set_color(color))
     Group(children) => Group(children.map(child => child.set_color(color)))
+  }
+}
+
+///|
+fn Node::copy(self : Node) -> Node {
+  match self {
+    Empty => Empty
+    Group(children) => Group(children.map(child => child.copy()))
+    Path(path, style) => Path({ commands: path.commands.copy() }, style)
+    Mesh(mesh, style) => Mesh(mesh.map_vertices(point => point), style)
   }
 }

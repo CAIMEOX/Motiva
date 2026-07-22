@@ -11,9 +11,9 @@ pub fn SvgObject::parse_string(
     Some(document) => document
     None => raise InvalidXml
   }
-  let definitions : Map[String, @xml.XMLElement] = {}
+  let definitions : Map[String, @xml.XMLElement] = Map([])
   collect_definitions(document.root, definitions)
-  let groups : Map[String, Array[@object.FamilyPath]] = {}
+  let groups : Map[String, Array[@object.FamilyPath]] = Map([])
   let diagnostics : Array[SvgDiagnostic] = []
   let object = evaluate_element(
     document.root,

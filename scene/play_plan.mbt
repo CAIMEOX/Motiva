@@ -44,6 +44,8 @@ pub struct PlayPlan {
   priv frame_rate : Double
   priv frame_times : Array[FrameTime]
   priv scheduled : Array[ScheduledAnimation]
+  priv suspended_targets : Array[UpdateTarget]
+  priv mut last_applied_play_time : Double
 }
 
 ///|
@@ -56,13 +58,13 @@ pub fn[T : IntoAnimation] Scene::compile_play_plan(
     raise EmptyPlay
   }
   let frame_rate = self.config.frame_rate
-  if frame_rate <= 0.0 || frame_rate.is_nan() {
+  if frame_rate <= 0.0 || frame_rate.is_nan() || frame_rate.is_inf() {
     raise InvalidFrameRate(frame_rate)
   }
   let active_animations = animations.map(animation => {
     ActiveAnimation::compile(self, into_animation(animation))
   })
-  validate_family_animation_targets(self, active_animations)
+  validate_animation_targets(self, active_animations)
   validate_run_times(active_animations)
   let scheduled = schedule_parallel(active_animations)
   let run_time = scheduled.fold(init=0.0, (duration, item) => {
@@ -72,6 +74,10 @@ pub fn[T : IntoAnimation] Scene::compile_play_plan(
       duration
     }
   })
+  let suspended_targets : Array[UpdateTarget] = []
+  for animation in active_animations {
+    suspended_targets.append(animation.suspended_targets(self))
+  }
   {
     start_time: self.time,
     run_time,
@@ -83,6 +89,8 @@ pub fn[T : IntoAnimation] Scene::compile_play_plan(
       config~,
     ),
     scheduled,
+    suspended_targets: unique_update_targets(suspended_targets),
+    last_applied_play_time: 0.0,
   }
 }
 
@@ -92,7 +100,7 @@ fn validate_run_times(
 ) -> Unit raise SceneError {
   for animation in animations {
     let run_time = animation.run_time()
-    if run_time <= 0.0 || run_time.is_nan() {
+    if run_time <= 0.0 || run_time.is_nan() || run_time.is_inf() {
       raise InvalidRunTime(run_time)
     }
   }
@@ -195,9 +203,23 @@ pub fn PlayPlan::affected_ids(self : PlayPlan) -> Array[ObjectId] {
 
 ///|
 pub fn PlayPlan::begin(self : PlayPlan, scene : Scene) -> Unit raise SceneError {
-  self.scheduled.each(item => {
-    scene.apply_frame_patch(item.animation.begin_patch())
-  })
+  self.last_applied_play_time = 0.0
+  scene.push_updater_suspensions(self.suspended_targets)
+  let result = try {
+    scene.apply_frame_patch(
+      FramePatch::all(self.scheduled.map(item => item.animation.begin_patch())),
+    )
+    Ok(())
+  } catch {
+    error => Err(error)
+  }
+  match result {
+    Ok(_) => ()
+    Err(error) => {
+      ignore(scene.pop_updater_suspensions(self.suspended_targets))
+      raise error
+    }
+  }
 }
 
 ///|
@@ -206,14 +228,20 @@ pub fn PlayPlan::apply_frame(
   scene : Scene,
   frame : FrameTime,
 ) -> Unit raise SceneError {
-  self.scheduled.each(item => {
+  let transaction = scene.frame_transaction()
+  let patches : Array[FramePatch] = []
+  for item in self.scheduled {
     if frame.play_time >= item.start_time && frame.play_time <= item.end_time {
-      scene.apply_frame_patch(
+      patches.push(
         item.animation.sample_at_time(frame.play_time - item.start_time),
       )
     }
-  })
-  scene.time = frame.absolute_time
+  }
+  transaction.apply_frame_patch_unchecked(FramePatch::all(patches))
+  transaction.time = frame.absolute_time
+  transaction.run_updaters(frame.dt)
+  scene.commit_frame_transaction(transaction)
+  self.last_applied_play_time = frame.play_time
 }
 
 ///|
@@ -221,8 +249,26 @@ pub fn PlayPlan::finish(
   self : PlayPlan,
   scene : Scene,
 ) -> Unit raise SceneError {
-  self.scheduled.each(item => {
-    scene.apply_frame_patch(item.animation.finish_patch())
-  })
-  scene.time = self.start_time + self.run_time
+  let transaction = scene.frame_transaction()
+  let remaining = self.run_time - self.last_applied_play_time
+  let finish_result = try {
+    transaction.apply_frame_patch_unchecked(
+      FramePatch::all(self.scheduled.map(item => item.animation.finish_patch())),
+    )
+    transaction.time = self.start_time + self.run_time
+    if remaining > 0.0 {
+      transaction.run_updaters(remaining)
+    }
+    Ok(())
+  } catch {
+    error => Err(error)
+  }
+  let resumed = scene.pop_updater_suspensions(self.suspended_targets)
+  match finish_result {
+    Err(error) => raise error
+    Ok(_) => {
+      scene.commit_frame_transaction(transaction)
+      scene.run_updaters_for_targets(resumed, 0.0)
+    }
+  }
 }

@@ -11,6 +11,23 @@ fn assert_point_close(actual : Vec3, expected : Vec3) -> Unit raise {
 }
 
 ///|
+test "object copy isolates mutable path storage" {
+  let path = Path3D::empty()
+  path.move_to(Vec3::zero())
+  let original = Object::path(path)
+  let copied = original.copy()
+  guard copied.node is Path(copied_path, _) else {
+    fail("copied path object should remain a path")
+  }
+  copied_path.line_to(Vec3::new(x=1.0, y=0.0))
+  guard original.node is Path(original_path, _) else {
+    fail("original path object should remain a path")
+  }
+  assert_eq(original_path.commands.length(), 1)
+  assert_eq(copied_path.commands.length(), 2)
+}
+
+///|
 fn assert_buffer_point_close(
   buffer : PathBuffer3D,
   index : Int,

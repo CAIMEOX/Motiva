@@ -104,6 +104,7 @@ fn Scene::insert_object_with_parent(
   object : @object.Object,
   state : ObjectState,
   parent : ObjectId?,
+  camera_binding? : CameraBinding = CameraWorld,
 ) -> ObjectId {
   let id = { value: self.next_id }
   self.next_id += 1
@@ -115,26 +116,29 @@ fn Scene::insert_object_with_parent(
         state,
         parent,
         children: [],
-        camera_binding: CameraWorld,
+        retired_children: [],
+        camera_binding,
       }
       let child_ids = children.map(child => {
-        self.insert_object_with_parent(child, state, Some(id))
+        self.insert_object_with_parent(child, state, Some(id), camera_binding~)
       })
       self.objects[id] = {
         object: shell,
         state,
         parent,
         children: child_ids,
-        camera_binding: CameraWorld,
+        retired_children: [],
+        camera_binding,
       }
     }
     _ =>
       self.objects[id] = {
-        object,
+        object: object.copy(),
         state,
         parent,
         children: [],
-        camera_binding: CameraWorld,
+        retired_children: [],
+        camera_binding,
       }
   }
   id
@@ -158,6 +162,96 @@ fn Scene::replace_local_object(
 ) -> Unit raise SceneError {
   self.validate_replacement_topology(id, object)
   self.write_local_object(id, object)
+}
+
+///|
+fn Scene::rebuild_object(
+  self : Scene,
+  id : ObjectId,
+  object : @object.Object,
+) -> Unit raise SceneError {
+  let local_object = self.to_local_object(id, object)
+  self.rebuild_local_object(id, local_object)
+}
+
+///|
+fn Scene::rebuild_local_object(
+  self : Scene,
+  id : ObjectId,
+  object : @object.Object,
+) -> Unit raise SceneError {
+  let scene_object = self.require_object(id)
+  match object.node {
+    Group(children) => {
+      let active : Array[ObjectId] = []
+      let retired = scene_object.retired_children.copy()
+      let mut retired_index = 0
+      for index in 0..<children.length() {
+        guard children.get(index) is Some(child) else { continue }
+        let child_id = match scene_object.children.get(index) {
+          Some(existing) => existing
+          None =>
+            match retired.get(retired_index) {
+              Some(existing) => {
+                retired_index += 1
+                self.attach_family_root(existing, id, scene_object.state)
+                existing
+              }
+              None =>
+                self.insert_object_with_parent(
+                  child,
+                  scene_object.state,
+                  Some(id),
+                  camera_binding=scene_object.camera_binding,
+                )
+            }
+        }
+        self.rebuild_local_object(child_id, child)
+        self.set_subtree_state(child_id, scene_object.state)
+        active.push(child_id)
+      }
+      let next_retired : Array[ObjectId] = []
+      for index in children.length()..<scene_object.children.length() {
+        match scene_object.children.get(index) {
+          Some(child) => {
+            self.retire_family_root(child)
+            next_retired.push(child)
+          }
+          None => ()
+        }
+      }
+      for index in retired_index..<retired.length() {
+        match retired.get(index) {
+          Some(child) => next_retired.push(child)
+          None => ()
+        }
+      }
+      self.objects[id] = {
+        object: family_shell(object),
+        state: scene_object.state,
+        parent: scene_object.parent,
+        children: active,
+        retired_children: next_retired,
+        camera_binding: scene_object.camera_binding,
+      }
+    }
+    _ => {
+      let retired : Array[ObjectId] = []
+      for child in scene_object.children {
+        self.retire_family_root(child)
+        retired.push(child)
+      }
+      retired.append(scene_object.retired_children)
+      self.objects[id] = {
+        object: object.copy(),
+        state: scene_object.state,
+        parent: scene_object.parent,
+        children: [],
+        retired_children: retired,
+        camera_binding: scene_object.camera_binding,
+      }
+    }
+  }
 }
 
 ///|
@@ -206,18 +300,51 @@ fn Scene::write_local_object(
         state: scene_object.state,
         parent: scene_object.parent,
         children: scene_object.children,
+        retired_children: scene_object.retired_children,
         camera_binding: scene_object.camera_binding,
       }
     }
     _ =>
       self.objects[id] = {
-        object,
+        object: object.copy(),
         state: scene_object.state,
         parent: scene_object.parent,
         children: [],
+        retired_children: scene_object.retired_children,
         camera_binding: scene_object.camera_binding,
       }
   }
+}
+
+///|
+fn Scene::attach_family_root(
+  self : Scene,
+  id : ObjectId,
+  parent : ObjectId,
+  state : ObjectState,
+) -> Unit {
+  match self.objects.get(id) {
+    Some(scene_object) => {
+      self.draw_order = self.draw_order.filter(current => current != id)
+      self.objects[id] = { ..scene_object, parent: Some(parent), state }
+      self.set_subtree_state(id, state)
+    }
+    None => ()
+  }
+}
+
+///|
+fn Scene::retire_family_root(self : Scene, id : ObjectId) -> Unit {
+  let retired_family = self.collect_family(id)
+  self.set_subtree_state(id, Removed)
+  match self.objects.get(id) {
+    Some(scene_object) =>
+      self.objects[id] = { ..scene_object, parent: None, state: Removed }
+    None => ()
+  }
+  self.foreground = self.foreground.filter(current => {
+    !retired_family.contains(current)
+  })
 }
 
 ///|

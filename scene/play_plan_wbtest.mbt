@@ -98,3 +98,31 @@ test "compile play plan rejects invalid frame rate" {
   }
   assert_plan_close(rate, 0.0)
 }
+
+///|
+test "compile play plan rejects non-finite timing inputs" {
+  let infinite_rate = Scene::new(config=SceneConfig::new(frame_rate=1.0 / 0.0))
+  let rate_object = infinite_rate.object(@object.Dot::new())
+  let rate_result = try
+    infinite_rate.compile_play_plan([Animation::create(rate_object)])
+  catch {
+    error => Err(error)
+  } noraise {
+    _ => Ok(())
+  }
+  guard rate_result is Err(InvalidFrameRate(_)) else {
+    fail("infinite frame rate should return a typed SceneError")
+  }
+  let scene = Scene::new()
+  let object = scene.object(@object.Dot::new())
+  let duration_result = try
+    scene.compile_play_plan([Animation::create(object, run_time=1.0 / 0.0)])
+  catch {
+    error => Err(error)
+  } noraise {
+    _ => Ok(())
+  }
+  guard duration_result is Err(InvalidRunTime(_)) else {
+    fail("infinite run time should return a typed SceneError")
+  }
+}

@@ -18,6 +18,9 @@ pub fn Scene::play_immediate(
 ) -> Unit raise SceneError {
   let plan = self.compile_play_plan(animations, config~)
   plan.begin(self)
+  for frame in plan.frame_times() {
+    plan.apply_frame(self, frame)
+  }
   plan.finish(self)
 }
 

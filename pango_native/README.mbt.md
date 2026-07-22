@@ -23,6 +23,7 @@ The native target requires `pkg-config`, PangoCairo 1.56 or newer, and Cairo.
 Motiva's root `build.js` discovers compiler and linker flags without hardcoding
 a Homebrew or Linux installation path. Set `PKG_CONFIG` to select a compatible
 `pkg-config` executable when cross-compiling or using a non-default sysroot.
+The FFI shares its Cairo linker contract with `cairoon/native`.
 
 ```mbt nocheck
 let text = @pango_native.Text::new(
