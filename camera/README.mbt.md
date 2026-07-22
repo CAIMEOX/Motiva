@@ -37,9 +37,17 @@ foreground draw layer.
 
 Depth is exposed by `Camera::depth_at`, but ordinary 2D objects keep their
 stable `z_index` order. As in Manim, depth sorting and automatic shading belong
-only to objects that explicitly opt into 3D shading; that object-family marker
-will arrive with the mesh/surface layer rather than being guessed by Camera.
+to mesh faces; ordinary paths are never reclassified as 3D geometry by Camera.
 
 `Scene::orbit_camera` represents a finite orbit in the normal animation
-timeline. Indefinite ambient rotation is intentionally left to the future
-updater system rather than introducing hidden work inside `Camera`.
+timeline. Indefinite ambient motion uses an explicit functional camera updater,
+so `Camera` itself remains a pure value:
+
+```mbt nocheck
+///|
+let ambient = scene.add_updater(
+  @scene.Updater::camera((camera, context) => {
+    camera.with_view(theta=camera.theta + 0.2 * context.dt())
+  }),
+)
+```

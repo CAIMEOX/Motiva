@@ -13,11 +13,25 @@ function runPkgConfig(args) {
   }
 }
 
+function withoutCairoLibrary(flags) {
+  return flags.replace(/(^|\s)-lcairo(?=\s|$)/g, "$1").trim();
+}
+
+function platformLinkFlags(flags) {
+  if (process.platform !== "darwin") {
+    return flags;
+  }
+  // Moon's synthetic black-box runner repeats a native-stub package's flags.
+  return `${flags} -Wl,-no_warn_duplicate_libraries`;
+}
+
 const supported = runPkgConfig(["--atleast-version=1.56", "pangocairo"]);
 const cflags =
   supported === null ? null : runPkgConfig(["--cflags", "pangocairo"]);
-const libs =
+const discoveredLibs =
   supported === null ? null : runPkgConfig(["--libs", "pangocairo"]);
+const libs =
+  discoveredLibs === null ? null : withoutCairoLibrary(discoveredLibs);
 const available = cflags !== null && libs !== null;
 
 console.log(
@@ -33,7 +47,7 @@ console.log(
         : [
             {
               package: "CAIMEOX/Motiva/pango_native",
-              link_flags: libs,
+              link_flags: platformLinkFlags(libs),
             },
           ],
   }),

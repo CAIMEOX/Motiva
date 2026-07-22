@@ -12,11 +12,3 @@ import {
 supported_targets = "+native"
 
 pkgtype(kind: "executable")
-
-options(
-  link: {
-    "native": {
-      "cc-link-flags": "-L/opt/homebrew/Cellar/cairo/1.18.4/lib -lcairo",
-    },
-  },
-)
