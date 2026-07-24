@@ -179,7 +179,7 @@ pub fn Text::set_color_by_range(
   end : Int,
   color : @object.Rgba,
 ) -> Text raise TextError {
-  validate_color(color, "range color")
+  color.validate_text_color("range color")
   let fragment = self.fragment(start, end)
   { ..self, object: apply_fragment_op(self.object, fragment, PathColor(color)) }
 }
@@ -190,7 +190,7 @@ pub fn Text::set_color_by_text(
   pattern : String,
   color : @object.Rgba,
 ) -> Text raise TextError {
-  validate_color(color, "text color")
+  color.validate_text_color("text color")
   let mut object = self.object
   for fragment in self.fragments_by_text(pattern) {
     object = apply_fragment_op(object, fragment, PathColor(color))
@@ -318,7 +318,7 @@ pub fn MarkupText::set_color_by_range(
   end : Int,
   color : @object.Rgba,
 ) -> MarkupText raise TextError {
-  validate_color(color, "range color")
+  color.validate_text_color("range color")
   let fragment = self.fragment(start, end)
   { ..self, object: apply_fragment_op(self.object, fragment, PathColor(color)) }
 }
@@ -329,7 +329,7 @@ pub fn MarkupText::set_color_by_text(
   pattern : String,
   color : @object.Rgba,
 ) -> MarkupText raise TextError {
-  validate_color(color, "text color")
+  color.validate_text_color("text color")
   let mut object = self.object
   for fragment in self.fragments_by_text(pattern) {
     object = apply_fragment_op(object, fragment, PathColor(color))
@@ -543,7 +543,7 @@ fn apply_cluster_gradient(
     raise InvalidGradient(0)
   }
   for color in colors {
-    validate_color(color, "gradient color")
+    color.validate_text_color("gradient color")
   }
   let visible = clusters.filter(cluster => !cluster.paths.is_empty())
   let mut result = object

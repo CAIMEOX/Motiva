@@ -1,0 +1,14 @@
+import {
+  "moonbitlang/core/encoding/utf8" @encoding/utf8,
+  "tonyfettes/cairo",
+  "tonyfettes/gobject",
+  "tonyfettes/pango",
+  "tonyfettes/pangocairo",
+}
+
+supported_targets = "+native"
+
+options(
+  link: { "native": { "stub-cc-flags": "${build.PANGOCAIRO_CC_FLAGS}" } },
+  "native-stub": [ "motiva_pango_svg_renderer.generated.c" ],
+)

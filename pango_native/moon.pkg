@@ -1,13 +1,13 @@
 import {
-  "CAIMEOX/cairoon/native" @cairo_native,
+  "CAIMEOX/cairoon",
   "CAIMEOX/Motiva/object",
+  "CAIMEOX/Motiva/pango_native/internal/renderer",
   "CAIMEOX/Motiva/svg",
   "moonbitlang/core/encoding/utf8",
+  "tonyfettes/cairo",
+  "tonyfettes/glib",
+  "tonyfettes/pango",
+  "tonyfettes/pangocairo",
 }
 
 supported_targets = "+native"
-
-options(
-  link: { "native": { "stub-cc-flags": "${build.PANGOCAIRO_CC_FLAGS}" } },
-  "native-stub": [ "pango_native.c" ],
-)

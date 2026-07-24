@@ -20,10 +20,12 @@ The package supports:
 - direct `IntoObject` conversion for Scene animations such as `Write`.
 
 The native target requires `pkg-config`, PangoCairo 1.56 or newer, and Cairo.
-Motiva's root `build.js` discovers compiler and linker flags without hardcoding
-a Homebrew or Linux installation path. Set `PKG_CONFIG` to select a compatible
-`pkg-config` executable when cross-compiling or using a non-default sysroot.
-The FFI shares its Cairo linker contract with `cairoon/native`.
+Motiva uses `tonyfettes/pango`, `tonyfettes/pangocairo`, and
+`tonyfettes/cairo` 0.2.0 for the native API and link configuration. The root
+`build.js` discovers the compiler flags needed by the generated renderer
+subclass without hardcoding a Homebrew or Linux installation path. Set
+`PKG_CONFIG` to select a compatible `pkg-config` executable when
+cross-compiling or using a non-default sysroot.
 
 ```mbt nocheck
 let text = @pango_native.Text::new(
@@ -51,7 +53,20 @@ They are useful for inspection and source-to-glyph queries, but they are not
 the centered and scaled coordinates of the resulting Motiva `Object`; use the
 object's bounds for scene layout.
 
-The native FFI and owned font-map structure follow the conventions demonstrated
-by `tonyfettes/pango`; Motiva keeps its binding local because text rendering also
-needs a custom cluster-aware `PangoRenderer`, explicit ownership, and typed
-error propagation.
+The cluster-aware renderer is a normal MoonBit GObject subclass in
+`pango_native/internal/renderer`. Its generated C file only installs the
+`PangoRenderer` subclass and dispatches virtual methods back to MoonBit; Motiva
+does not keep a handwritten Pango or Cairo API stub.
+
+Regenerate the two `motiva_pango_svg_renderer.generated.*` files from a
+`tonyfettes/g` checkout:
+
+```sh
+moon run --target native gir/subclass/main -- \
+  --config pango/gir.json \
+  --pkg pango \
+  --symbol-prefix motiva_pango_native_renderer \
+  --gir-dir /path/to/gir-1.0 \
+  --output /path/to/Motiva/pango_native/internal/renderer \
+  /path/to/Motiva/pango_native/internal/renderer/renderer.mbt
+```

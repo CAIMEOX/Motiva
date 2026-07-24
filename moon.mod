@@ -27,6 +27,11 @@ import {
   "CAIMEOX/cairoon@0.2.0",
   "moonbitlang/async@0.19.1",
   "moonbit-community/XMLParser@0.2.5",
+  "tonyfettes/cairo@0.2.0",
+  "tonyfettes/gobject@0.2.0",
+  "tonyfettes/pango@0.2.0",
+  "tonyfettes/pangocairo@0.2.0",
+  "tonyfettes/glib@0.2.0",
 }
 
 options(
