@@ -14,13 +14,21 @@ pub(all) struct FontRegistration {
 
 ///|
 pub struct PangoTextEngine {
-  priv native : NativeEngine
+  priv mut font_map : @pangocairo.FontMap
+  priv font_files : Array[String]
+}
+
+///|
+priv struct PangoRenderAttributes(@pango.AttrList)
+
+///|
+priv struct SvgGeometryIndex {
+  object : @object.Object
 }
 
 ///|
 pub fn PangoTextEngine::new() -> PangoTextEngine {
-  ignore(@cairo_native.native_anchor())
-  { native: native_engine_new() }
+  { font_map: @pangocairo.FontMap::new(), font_files: [] }
 }
 
 ///|
@@ -30,12 +38,12 @@ pub impl Default for PangoTextEngine with fn default() {
 
 ///|
 pub fn pango_version() -> String {
-  @utf8.decode_lossy(native_pango_version())
+  @pango.version_string()
 }
 
 ///|
 pub fn cairo_version() -> String {
-  @utf8.decode_lossy(native_cairo_version())
+  @cairoon.cairo_version_string()
 }
 
 ///|
@@ -43,8 +51,20 @@ pub fn PangoTextEngine::register_font(
   self : PangoTextEngine,
   path : String,
 ) -> FontRegistration raise TextError {
-  let status = native_engine_register_font(self.native, @utf8.encode(path))
-  check_native_status(status)
+  if path == "" {
+    raise Native(status=1, message="empty font path")
+  }
+  if self.font_files.contains(path) {
+    return { path, }
+  }
+  let added = self.font_map.as_pango_font_map().add_font_file(path) catch {
+      error => raise Native(status=5, message=error.message())
+    }
+  if !added {
+    raise Native(status=5, message="failed to register font")
+  }
+  self.font_map.as_pango_font_map().changed()
+  self.font_files.push(path)
   { path, }
 }
 
@@ -53,21 +73,42 @@ pub fn PangoTextEngine::unregister_font(
   self : PangoTextEngine,
   registration : FontRegistration,
 ) -> Unit raise TextError {
-  let status = native_engine_unregister_font(
-    self.native,
-    @utf8.encode(registration.path),
-  )
-  check_native_status(status)
+  let mut removed_index = -1
+  for index, path in self.font_files {
+    if path == registration.path {
+      removed_index = index
+      break
+    }
+  }
+  if removed_index < 0 {
+    raise Native(
+      status=7,
+      message="font is not registered with this text engine",
+    )
+  }
+  let replacement = @pangocairo.FontMap::new()
+  for index, path in self.font_files {
+    if index != removed_index {
+      let added = replacement.as_pango_font_map().add_font_file(path) catch {
+          error => raise Native(status=5, message=error.message())
+        }
+      if !added {
+        raise Native(status=5, message="failed to rebuild font map")
+      }
+    }
+  }
+  self.font_map = replacement
+  ignore(self.font_files.remove(removed_index))
 }
 
 ///|
 pub fn PangoTextEngine::font_list(self : PangoTextEngine) -> Array[String] {
-  let native = native_engine_list_fonts(self.native)
-  [
-    for index in 0..<native_font_list_length(native) => {
-      @utf8.decode_lossy(native_font_list_get(native, index))
-    }
-  ]
+  let names = self.font_map
+    .as_pango_font_map()
+    .list_families()
+    .map(family => family.get_name())
+  names.sort()
+  names
 }
 
 ///|
@@ -80,36 +121,27 @@ pub fn PangoTextEngine::has_font(
 }
 
 ///|
-fn check_native_status(status : NativeStatus) -> Unit raise TextError {
-  let code = native_status_code(status)
-  if code != 0 {
-    raise Native(
-      status=code,
-      message=@utf8.decode_lossy(native_status_message(status)),
-    )
-  }
-}
-
-///|
 pub fn PangoTextEngine::render_text(
   self : PangoTextEngine,
   spec : TextSpec,
 ) -> RenderedText raise TextError {
-  validate_style(spec.style)
-  validate_layout(spec.layout)
+  spec.style.validate()
+  spec.layout.validate()
   let index_map = prepare_plain_text(spec.text, spec.tab_width)
-  let job = make_native_job(
-    index_map.rendered,
-    markup=false,
-    spec.style,
-    spec.layout,
-    spec.disable_ligatures,
+  let attributes = PangoRenderAttributes(@pango.AttrList::new())
+  attributes.apply_base_features(
+    combined_font_features(spec.style.font_features, spec.disable_ligatures),
   )
   for span in spec.spans {
-    apply_span(job, index_map, span)
+    span.validate()
+    let (start, end) = index_map.span_bytes(span.start, span.end)
+    attributes.apply_span(span, start, end)
   }
-  lower_native_render(
-    native_job_render(self.native, job),
+  self.render_configured(
+    index_map.rendered,
+    spec.style,
+    spec.layout,
+    attributes,
     index_map,
     expected_native_text=Some(index_map.rendered),
   )
@@ -120,21 +152,23 @@ pub fn PangoTextEngine::render_markup(
   self : PangoTextEngine,
   spec : MarkupTextSpec,
 ) -> RenderedText raise TextError {
-  validate_style(spec.style)
-  validate_layout(spec.layout)
+  spec.style.validate()
+  spec.layout.validate()
   let expanded_markup = prepare_plain_text(spec.markup, spec.tab_width).rendered
-  let job = make_native_job(
-    expanded_markup,
-    markup=true,
+  let (parsed_attributes, plain_text, _) = @pango.parse_markup(
+    expanded_markup, -1, 0,
+  ) catch {
+    error => raise InvalidMarkup(error.message())
+  }
+  let attributes = PangoRenderAttributes(parsed_attributes)
+  attributes.apply_base_features(
+    combined_font_features(spec.style.font_features, spec.disable_ligatures),
+  )
+  self.render_configured(
+    plain_text,
     spec.style,
     spec.layout,
-    spec.disable_ligatures,
-  )
-  let native = native_job_render(self.native, job)
-  check_render_status(native)
-  let plain_text = @utf8.decode_lossy(native_render_text(native))
-  lower_native_render(
-    native,
+    attributes,
     prepare_identity_text(plain_text),
     expected_native_text=None,
   )
@@ -148,37 +182,6 @@ pub fn render_text(spec : TextSpec) -> RenderedText raise TextError {
 ///|
 pub fn render_markup(spec : MarkupTextSpec) -> RenderedText raise TextError {
   PangoTextEngine::new().render_markup(spec)
-}
-
-///|
-fn make_native_job(
-  source : String,
-  markup~ : Bool,
-  style : TextStyle,
-  layout : TextLayout,
-  disable_ligatures : Bool,
-) -> NativeJob raise TextError {
-  let features = combined_font_features(style.font_features, disable_ligatures)
-  let job = native_job_new(@utf8.encode(source), markup)
-  native_job_set_font(
-    job,
-    @utf8.encode(style.font_family),
-    style.font_size / manim_text_adjustment,
-    slant_code(style.slant),
-    weight_code(style.weight),
-    stretch_code(style.stretch),
-  )
-  native_job_set_paint(
-    job,
-    style.color.r,
-    style.color.g,
-    style.color.b,
-    style.color.a,
-  )
-  native_job_set_base_language(job, @utf8.encode(style.language.unwrap_or("")))
-  native_job_set_base_features(job, @utf8.encode(features))
-  configure_native_layout(job, layout)
-  job
 }
 
 ///|
@@ -196,212 +199,284 @@ fn combined_font_features(
 }
 
 ///|
-fn configure_native_layout(
-  job : NativeJob,
-  layout : TextLayout,
-) -> Unit raise TextError {
-  let (has_width, width) = layout.width.map_or((false, 0.0), width => {
-    (true, width)
-  })
-  let (height_mode, height) = match (layout.height, layout.max_lines) {
-    (Some(_), Some(_)) =>
-      raise InvalidLayout("height and max_lines cannot both be set")
-    (Some(height), None) => (1, height)
-    (None, Some(lines)) => (2, Double::from_int(lines))
-    (None, None) => (0, 0.0)
-  }
-  let (has_line_spacing, line_spacing) = layout.line_spacing.map_or(
-    (false, 0.0),
-    spacing => (true, spacing),
-  )
-  native_job_set_box(job, has_width, width, height_mode, height, layout.dpi)
-  native_job_set_flow(
-    job,
-    wrap_code(layout.wrap),
-    ellipsize_code(layout.ellipsize),
-    alignment_code(layout.alignment),
-    layout.auto_dir,
-    direction_code(layout.direction),
-    layout.single_paragraph,
-  )
-  native_job_set_paragraph(
-    job,
-    layout.justify,
-    layout.justify_last_line,
-    layout.indent,
-    layout.spacing,
-    has_line_spacing,
-    line_spacing,
-  )
+fn PangoRenderAttributes::change_range(
+  self : PangoRenderAttributes,
+  attribute : @pango.Attribute,
+  start : Int,
+  end : Int,
+) -> Unit {
+  attribute.set_start_index(start.reinterpret_as_uint())
+  attribute.set_end_index(end.reinterpret_as_uint())
+  self.0.change(attribute)
 }
 
 ///|
-fn apply_span(
-  job : NativeJob,
-  index_map : TextIndexMap,
+fn PangoRenderAttributes::change_full(
+  self : PangoRenderAttributes,
+  attribute : @pango.Attribute,
+) -> Unit {
+  attribute.set_start_index(@pango.ATTR_INDEX_FROM_TEXT_BEGINNING)
+  attribute.set_end_index(@pango.ATTR_INDEX_TO_TEXT_END)
+  self.0.change(attribute)
+}
+
+///|
+fn PangoRenderAttributes::color_channel(
+  self : PangoRenderAttributes,
+  value : Double,
+) -> UInt {
+  ignore(self)
+  (value.clamp(min=0.0, max=1.0) * 65535.0).round().to_uint()
+}
+
+///|
+fn PangoRenderAttributes::apply_base_features(
+  self : PangoRenderAttributes,
+  features : String,
+) -> Unit {
+  if features != "" {
+    self.change_full(@pango.AttrFontFeatures::new(features))
+  }
+}
+
+///|
+fn PangoRenderAttributes::apply_span(
+  self : PangoRenderAttributes,
   span : TextSpan,
-) -> Unit raise TextError {
-  validate_span(span)
-  let (start, end) = index_map.span_bytes(span.start, span.end)
-  match span.font_family {
-    Some(family) => native_job_add_family(job, start, end, @utf8.encode(family))
-    None => ()
+  start : Int,
+  end : Int,
+) -> Unit {
+  if span.font_family is Some(family) {
+    self.change_range(@pango.attr_family_new(family), start, end)
   }
-  match span.font_size {
-    Some(size) =>
-      native_job_add_size(job, start, end, size / manim_text_adjustment)
-    None => ()
+  if span.font_size is Some(size) {
+    self.change_range(
+      @pango.AttrSize::new(
+        @pango.units_from_double(size / manim_text_adjustment),
+      ),
+      start,
+      end,
+    )
   }
-  match span.slant {
-    Some(slant) => native_job_add_slant(job, start, end, slant_code(slant))
-    None => ()
+  if span.slant is Some(slant) {
+    self.change_range(@pango.attr_style_new(slant.to_pango()), start, end)
   }
-  match span.weight {
-    Some(weight) => native_job_add_weight(job, start, end, weight_code(weight))
-    None => ()
+  if span.weight is Some(weight) {
+    self.change_range(@pango.attr_weight_new(weight.to_pango()), start, end)
   }
-  match span.stretch {
-    Some(stretch) =>
-      native_job_add_stretch(job, start, end, stretch_code(stretch))
-    None => ()
+  if span.stretch is Some(stretch) {
+    self.change_range(@pango.attr_stretch_new(stretch.to_pango()), start, end)
   }
-  match span.color {
-    Some(color) =>
-      native_job_add_foreground(
-        job,
-        start,
-        end,
-        color.r,
-        color.g,
-        color.b,
-        color.a,
-      )
-    None => ()
+  if span.color is Some(color) {
+    self.change_range(
+      @pango.attr_foreground_new(
+        self.color_channel(color.r),
+        self.color_channel(color.g),
+        self.color_channel(color.b),
+      ),
+      start,
+      end,
+    )
+    self.change_range(
+      @pango.attr_foreground_alpha_new(self.color_channel(color.a)),
+      start,
+      end,
+    )
   }
-  match span.background {
-    Some(color) =>
-      native_job_add_background(
-        job,
-        start,
-        end,
-        color.r,
-        color.g,
-        color.b,
-        color.a,
-      )
-    None => ()
+  if span.background is Some(color) {
+    self.change_range(
+      @pango.attr_background_new(
+        self.color_channel(color.r),
+        self.color_channel(color.g),
+        self.color_channel(color.b),
+      ),
+      start,
+      end,
+    )
+    self.change_range(
+      @pango.attr_background_alpha_new(self.color_channel(color.a)),
+      start,
+      end,
+    )
   }
-  match span.underline {
-    Some(underline) =>
-      native_job_add_underline(job, start, end, underline_code(underline))
-    None => ()
+  if span.underline is Some(underline) {
+    self.change_range(
+      @pango.attr_underline_new(underline.to_pango()),
+      start,
+      end,
+    )
   }
-  match span.underline_color {
-    Some(color) =>
-      native_job_add_underline_color(job, start, end, color.r, color.g, color.b)
-    None => ()
+  if span.underline_color is Some(color) {
+    self.change_range(
+      @pango.attr_underline_color_new(
+        self.color_channel(color.r),
+        self.color_channel(color.g),
+        self.color_channel(color.b),
+      ),
+      start,
+      end,
+    )
   }
-  match span.overline {
-    Some(enabled) => native_job_add_overline(job, start, end, enabled)
-    None => ()
+  if span.overline is Some(enabled) {
+    self.change_range(
+      @pango.attr_overline_new(
+        if enabled {
+          @pango.Overline::Single
+        } else {
+          @pango.Overline::None
+        },
+      ),
+      start,
+      end,
+    )
   }
-  match span.overline_color {
-    Some(color) =>
-      native_job_add_overline_color(job, start, end, color.r, color.g, color.b)
-    None => ()
+  if span.overline_color is Some(color) {
+    self.change_range(
+      @pango.attr_overline_color_new(
+        self.color_channel(color.r),
+        self.color_channel(color.g),
+        self.color_channel(color.b),
+      ),
+      start,
+      end,
+    )
   }
-  match span.strikethrough {
-    Some(enabled) => native_job_add_strikethrough(job, start, end, enabled)
-    None => ()
+  if span.strikethrough is Some(enabled) {
+    self.change_range(@pango.attr_strikethrough_new(enabled), start, end)
   }
-  match span.strikethrough_color {
-    Some(color) =>
-      native_job_add_strikethrough_color(
-        job,
-        start,
-        end,
-        color.r,
-        color.g,
-        color.b,
-      )
-    None => ()
+  if span.strikethrough_color is Some(color) {
+    self.change_range(
+      @pango.attr_strikethrough_color_new(
+        self.color_channel(color.r),
+        self.color_channel(color.g),
+        self.color_channel(color.b),
+      ),
+      start,
+      end,
+    )
   }
-  match span.rise {
-    Some(rise) => native_job_add_rise(job, start, end, rise)
-    None => ()
+  if span.rise is Some(rise) {
+    self.change_range(
+      @pango.attr_rise_new(@pango.units_from_double(rise)),
+      start,
+      end,
+    )
   }
-  match span.letter_spacing {
-    Some(spacing) => native_job_add_letter_spacing(job, start, end, spacing)
-    None => ()
+  if span.letter_spacing is Some(spacing) {
+    self.change_range(
+      @pango.attr_letter_spacing_new(@pango.units_from_double(spacing)),
+      start,
+      end,
+    )
   }
-  match span.font_features {
-    Some(features) =>
-      native_job_add_font_features(job, start, end, @utf8.encode(features))
-    None => ()
+  if span.font_features is Some(features) {
+    self.change_range(@pango.AttrFontFeatures::new(features), start, end)
   }
-  match span.language {
-    Some(language) =>
-      native_job_add_language(job, start, end, @utf8.encode(language))
-    None => ()
+  if span.language is Some(language) &&
+    @pango.Language::from_string(Some(language)) is Some(language) {
+    self.change_range(@pango.AttrLanguage::new(language), start, end)
   }
 }
 
 ///|
-fn lower_native_render(
-  native : NativeRender,
-  index_map : TextIndexMap,
-  expected_native_text~ : String?,
-) -> RenderedText raise TextError {
-  check_render_status(native)
-  let native_text = @utf8.decode_lossy(native_render_text(native))
-  match expected_native_text {
-    Some(expected) if native_text != expected =>
-      raise Native(
-        status=4,
-        message="Pango changed the plain text unexpectedly",
-      )
-    _ => ()
+fn PangoTextEngine::build_layout(
+  self : PangoTextEngine,
+  source : String,
+  style : TextStyle,
+  layout_options : TextLayout,
+  attributes : PangoRenderAttributes,
+  cairo : @cairo.Context,
+) -> @pango.Layout {
+  let context = self.font_map.as_pango_font_map().create_context()
+  @pangocairo.context_set_resolution(context, layout_options.dpi)
+  context.set_base_dir(layout_options.direction.to_pango())
+  if style.language is Some(language) &&
+    @pango.Language::from_string(Some(language)) is Some(language) {
+    context.set_language(Some(language))
   }
-  let svg_source = @utf8.decode_lossy(native_render_svg(native))
-  let svg = @svg.SvgObject::parse_string(svg_source, center=false) catch {
-    error => raise SvgParse(error)
+  @pangocairo.update_context(cairo, context)
+  let layout = @pango.Layout::new(context)
+  let description = @pango.FontDescription::new()
+  if style.font_family != "" {
+    description.set_family(style.font_family)
   }
-  let svg_object = svg.object()
-  let metrics = read_metrics(native)
-  let clusters = read_clusters(native, index_map, svg, svg_object)
-  clusters.sort_by((left, right) => {
-    if left.range.start != right.range.start {
-      left.range.start - right.range.start
-    } else {
-      left.range.end - right.range.end
-    }
-  })
+  description.set_size(
+    @pango.units_from_double(style.font_size / manim_text_adjustment),
+  )
+  description.set_style(style.slant.to_pango())
+  description.set_weight(style.weight.to_pango())
+  description.set_stretch(style.stretch.to_pango())
+  layout.set_font_description(Some(description))
+  layout.set_text(source, -1)
+  layout.set_attributes(Some(attributes.0))
+  if layout_options.width is Some(width) {
+    layout.set_width(@pango.units_from_double(width))
+  }
+  if layout_options.height is Some(height) {
+    layout.set_height(@pango.units_from_double(height))
+  } else if layout_options.max_lines is Some(lines) {
+    layout.set_height(0 - lines)
+  }
+  layout.set_wrap(layout_options.wrap.to_pango())
+  layout.set_ellipsize(layout_options.ellipsize.to_pango())
+  layout.set_alignment(layout_options.alignment.to_pango())
+  layout.set_justify(layout_options.justify)
+  layout.set_justify_last_line(layout_options.justify_last_line)
+  layout.set_indent(@pango.units_from_double(layout_options.indent))
+  layout.set_spacing(@pango.units_from_double(layout_options.spacing))
+  if layout_options.line_spacing is Some(spacing) {
+    layout.set_line_spacing(Float::from_double(spacing))
+  }
+  layout.set_auto_dir(layout_options.auto_dir)
+  layout.set_single_paragraph_mode(layout_options.single_paragraph)
+  @pangocairo.update_layout(cairo, layout)
+  layout
+}
+
+///|
+fn @pango.Rectangle::to_motiva_rect(self : @pango.Rectangle) -> PangoRect {
   {
-    source: index_map.source,
-    character_count: index_map.source_character_count,
-    svg,
-    clusters,
-    lines: read_lines(native, index_map),
-    metrics,
+    x: @pango.units_to_double(self.get_x()),
+    y: @pango.units_to_double(self.get_y()),
+    width: @pango.units_to_double(self.get_width()),
+    height: @pango.units_to_double(self.get_height()),
   }
 }
 
 ///|
-fn family_path_has_geometry(
-  object : @object.Object,
-  path : @object.FamilyPath,
-) -> Bool {
-  object_at_family_indices(object, path.indices(), 0)
-  .bind(child => child.bounds())
-  .map_or(false, bounds => bounds.width() != 0.0 || bounds.height() != 0.0)
+fn @pango.Layout::motiva_lines(
+  self : @pango.Layout,
+  index_map : TextIndexMap,
+) -> Array[PangoTextLine] raise TextError {
+  let lines : Array[PangoTextLine] = []
+  let iterator = self.get_iter()
+  let mut more = true
+  while more {
+    if iterator.get_line_readonly() is Some(line) {
+      let (ink, logical) = iterator.get_line_extents()
+      lines.push({
+        range: index_map.source_range(
+          line.get_start_index(),
+          line.get_start_index() + line.get_length(),
+        ),
+        pango_ink: ink.to_motiva_rect(),
+        pango_logical: logical.to_motiva_rect(),
+        pango_baseline: @pango.units_to_double(iterator.get_baseline()),
+      })
+    }
+    more = iterator.next_line()
+  }
+  lines
 }
 
 ///|
-fn object_at_family_indices(
+fn SvgGeometryIndex::object_at(
+  self : SvgGeometryIndex,
   object : @object.Object,
   indices : Array[Int],
   depth : Int,
 ) -> @object.Object? {
+  ignore(self)
   if depth == indices.length() {
     return Some(object)
   }
@@ -409,160 +484,140 @@ fn object_at_family_indices(
     Group(children) =>
       children
       .get(indices[depth])
-      .bind(child => object_at_family_indices(child, indices, depth + 1))
+      .bind(child => self.object_at(child, indices, depth + 1))
     _ => None
   }
 }
 
 ///|
-fn check_render_status(native : NativeRender) -> Unit raise TextError {
-  let status = native_render_status(native)
-  if status != 0 {
-    let message = @utf8.decode_lossy(native_render_message(native))
-    if status == 2 {
-      raise InvalidMarkup(message)
-    }
-    raise Native(status~, message~)
-  }
+fn SvgGeometryIndex::has_geometry(
+  self : SvgGeometryIndex,
+  path : @object.FamilyPath,
+) -> Bool {
+  self
+  .object_at(self.object, path.indices(), 0)
+  .bind(child => child.bounds())
+  .map_or(false, bounds => bounds.width() != 0.0 || bounds.height() != 0.0)
 }
 
 ///|
-fn read_metrics(native : NativeRender) -> PangoTextMetrics {
-  let ink_x = Ref(0.0)
-  let ink_y = Ref(0.0)
-  let ink_width = Ref(0.0)
-  let ink_height = Ref(0.0)
-  let logical_x = Ref(0.0)
-  let logical_y = Ref(0.0)
-  let logical_width = Ref(0.0)
-  let logical_height = Ref(0.0)
-  let baseline = Ref(0.0)
-  let unknown_glyphs = Ref(0)
-  let glyph_count = Ref(0)
-  let line_count = Ref(0)
-  native_render_metrics(
-    native, ink_x, ink_y, ink_width, ink_height, logical_x, logical_y, logical_width,
-    logical_height, baseline, unknown_glyphs, glyph_count, line_count,
-  )
-  {
-    ink: {
-      x: ink_x.val,
-      y: ink_y.val,
-      width: ink_width.val,
-      height: ink_height.val,
-    },
-    logical: {
-      x: logical_x.val,
-      y: logical_y.val,
-      width: logical_width.val,
-      height: logical_height.val,
-    },
-    baseline: baseline.val,
-    unknown_glyphs: unknown_glyphs.val,
-    glyph_count: glyph_count.val,
-    line_count: line_count.val,
-  }
-}
-
-///|
-fn read_clusters(
-  native : NativeRender,
+fn @renderer.RendererOutput::motiva_clusters(
+  self : @renderer.RendererOutput,
   index_map : TextIndexMap,
   svg : @svg.SvgObject,
   svg_object : @object.Object,
 ) -> Array[TextCluster] raise TextError {
-  let clusters : Array[TextCluster] = []
-  for index in 0..<native_render_cluster_count(native) {
-    let source_start = Ref(0)
-    let source_end = Ref(0)
-    let glyph_start = Ref(0)
-    let glyph_end = Ref(0)
-    let line_index = Ref(0)
-    let bidi_level = Ref(0)
-    let x = Ref(0.0)
-    let y = Ref(0.0)
-    let width = Ref(0.0)
-    let height = Ref(0.0)
-    let present = native_render_cluster(
-      native, index, source_start, source_end, glyph_start, glyph_end, line_index,
-      bidi_level, x, y, width, height,
-    )
-    if !present {
-      raise Native(status=4, message="missing Pango cluster record")
+  let geometry = SvgGeometryIndex::{ object: svg_object }
+  let clusters = [
+    for index, cluster in self.clusters => {
+      {
+        range: index_map.source_range(cluster.source_start, cluster.source_end),
+        glyphs: { start: cluster.glyph_start, end: cluster.glyph_end },
+        line_index: cluster.line_index,
+        bidi_level: cluster.bidi_level,
+        pango_logical_bounds: {
+          x: cluster.x,
+          y: cluster.y,
+          width: cluster.width,
+          height: cluster.height,
+        },
+        paths: svg
+        .group_paths("motiva-cluster-\{index}")
+        .filter(path => geometry.has_geometry(path)),
+      }
     }
-    let paths = svg
-      .group_paths("motiva-cluster-\{index}")
-      .filter(path => family_path_has_geometry(svg_object, path))
-    clusters.push({
-      range: index_map.source_range(source_start.val, source_end.val),
-      glyphs: { start: glyph_start.val, end: glyph_end.val },
-      line_index: line_index.val,
-      bidi_level: bidi_level.val,
-      pango_logical_bounds: {
-        x: x.val,
-        y: y.val,
-        width: width.val,
-        height: height.val,
-      },
-      paths,
-    })
-  }
+  ]
+  clusters.sort_by((left, right) => {
+    if left.range.start != right.range.start {
+      left.range.start - right.range.start
+    } else {
+      left.range.end - right.range.end
+    }
+  })
   clusters
 }
 
 ///|
-fn read_lines(
-  native : NativeRender,
+fn PangoTextEngine::render_configured(
+  self : PangoTextEngine,
+  source : String,
+  style : TextStyle,
+  layout_options : TextLayout,
+  attributes : PangoRenderAttributes,
   index_map : TextIndexMap,
-) -> Array[PangoTextLine] raise TextError {
-  let lines : Array[PangoTextLine] = []
-  for index in 0..<native_render_line_count(native) {
-    let source_start = Ref(0)
-    let source_end = Ref(0)
-    let ink_x = Ref(0.0)
-    let ink_y = Ref(0.0)
-    let ink_width = Ref(0.0)
-    let ink_height = Ref(0.0)
-    let logical_x = Ref(0.0)
-    let logical_y = Ref(0.0)
-    let logical_width = Ref(0.0)
-    let logical_height = Ref(0.0)
-    let baseline = Ref(0.0)
-    let present = native_render_line(
-      native, index, source_start, source_end, ink_x, ink_y, ink_width, ink_height,
-      logical_x, logical_y, logical_width, logical_height, baseline,
-    )
-    if !present {
-      raise Native(status=4, message="missing Pango line record")
-    }
-    lines.push({
-      range: index_map.source_range(source_start.val, source_end.val),
-      pango_ink: {
-        x: ink_x.val,
-        y: ink_y.val,
-        width: ink_width.val,
-        height: ink_height.val,
-      },
-      pango_logical: {
-        x: logical_x.val,
-        y: logical_y.val,
-        width: logical_width.val,
-        height: logical_height.val,
-      },
-      pango_baseline: baseline.val,
-    })
+  expected_native_text~ : String?,
+) -> RenderedText raise TextError {
+  let surface = @cairo.Surface::create_recording(@cairo.Content::ColorAlpha)
+  let cairo = @cairo.Context::create(surface)
+  if !surface.status().is_success() {
+    let status = surface.status()
+    raise Native(status=status.to_int(), message=status.to_string())
   }
-  lines
+  if !cairo.status().is_success() {
+    let status = cairo.status()
+    raise Native(status=status.to_int(), message=status.to_string())
+  }
+  let layout = self.build_layout(
+    source, style, layout_options, attributes, cairo,
+  )
+  let native_text = layout.get_text()
+  if expected_native_text is Some(expected) && native_text != expected {
+    raise Native(status=4, message="Pango changed the plain text unexpectedly")
+  }
+  let (ink, logical) = layout.get_extents()
+  let ink = ink.to_motiva_rect()
+  let logical = logical.to_motiva_rect()
+  let metrics : PangoTextMetrics = {
+    ink,
+    logical,
+    baseline: @pango.units_to_double(layout.get_baseline()),
+    unknown_glyphs: layout.get_unknown_glyphs_count(),
+    glyph_count: 0,
+    line_count: layout.get_line_count(),
+  }
+  let min_x = Double::min(ink.x, logical.x)
+  let min_y = Double::min(ink.y, logical.y)
+  let max_x = Double::max(ink.x + ink.width, logical.x + logical.width)
+  let max_y = Double::max(ink.y + ink.height, logical.y + logical.height)
+  let padding = 1.0
+  let surface_width = Double::max(1.0, max_x - min_x + 2.0 * padding).ceil()
+  let surface_height = Double::max(1.0, max_y - min_y + 2.0 * padding).ceil()
+  let output = @renderer.render(
+    layout,
+    cairo,
+    surface_width,
+    surface_height,
+    padding - min_x,
+    padding - min_y,
+    style.color.r,
+    style.color.g,
+    style.color.b,
+    style.color.a,
+  ) catch {
+    @renderer.RendererFailed(message) => raise Native(status=3, message~)
+  }
+  let svg = @svg.SvgObject::parse_string(output.svg, center=false) catch {
+    error => raise SvgParse(error)
+  }
+  let svg_object = svg.object()
+  {
+    source: index_map.source,
+    character_count: index_map.source_character_count,
+    svg,
+    clusters: output.motiva_clusters(index_map, svg, svg_object),
+    lines: layout.motiva_lines(index_map),
+    metrics: { ..metrics, glyph_count: output.glyph_count },
+  }
 }
 
 ///|
-fn validate_style(style : TextStyle) -> Unit raise TextError {
-  validate_font_size(style.font_size)
-  validate_color(style.color, "text color")
+fn TextStyle::validate(self : TextStyle) -> Unit raise TextError {
+  TextStyle::validate_font_size(self.font_size)
+  self.color.validate_text_color("text color")
 }
 
 ///|
-fn validate_font_size(size : Double) -> Unit raise TextError {
+fn TextStyle::validate_font_size(size : Double) -> Unit raise TextError {
   if size <= 0.0 ||
     size.is_nan() ||
     size.is_inf() ||
@@ -572,38 +627,37 @@ fn validate_font_size(size : Double) -> Unit raise TextError {
 }
 
 ///|
-fn validate_span(span : TextSpan) -> Unit raise TextError {
-  match span.font_size {
-    Some(size) => validate_font_size(size)
-    None => ()
+fn TextSpan::validate(self : TextSpan) -> Unit raise TextError {
+  if self.font_size is Some(size) {
+    TextStyle::validate_font_size(size)
   }
   for
     entry in [
-      ("foreground", span.color),
-      ("background", span.background),
-      ("underline", span.underline_color),
-      ("overline", span.overline_color),
-      ("strikethrough", span.strikethrough_color),
+      ("foreground", self.color),
+      ("background", self.background),
+      ("underline", self.underline_color),
+      ("overline", self.overline_color),
+      ("strikethrough", self.strikethrough_color),
     ] {
     let (name, color) = entry
-    match color {
-      Some(color) => validate_color(color, name)
-      None => ()
+    if color is Some(color) {
+      color.validate_text_color(name)
     }
   }
-  match span.rise {
-    Some(value) => validate_pango_value(value, "rise")
-    None => ()
+  if self.rise is Some(value) {
+    TextLayout::validate_pango_value(value, "rise")
   }
-  match span.letter_spacing {
-    Some(value) => validate_pango_value(value, "letter_spacing")
-    None => ()
+  if self.letter_spacing is Some(value) {
+    TextLayout::validate_pango_value(value, "letter_spacing")
   }
 }
 
 ///|
-fn validate_color(color : @object.Rgba, name : String) -> Unit raise TextError {
-  for channel in [color.r, color.g, color.b, color.a] {
+fn @object.Rgba::validate_text_color(
+  self : @object.Rgba,
+  name : String,
+) -> Unit raise TextError {
+  for channel in [self.r, self.g, self.b, self.a] {
     if channel < 0.0 || channel > 1.0 || channel.is_nan() || channel.is_inf() {
       raise InvalidColor(
         "\{name} channels must be finite and between zero and one",
@@ -613,136 +667,138 @@ fn validate_color(color : @object.Rgba, name : String) -> Unit raise TextError {
 }
 
 ///|
-fn validate_pango_value(value : Double, name : String) -> Unit raise TextError {
+fn TextLayout::validate_pango_value(
+  value : Double,
+  name : String,
+) -> Unit raise TextError {
   if value.is_nan() || value.is_inf() || Double::abs(value) > max_pango_value {
     raise InvalidLayout("\{name} exceeds the finite Pango unit range")
   }
 }
 
 ///|
-fn validate_layout(layout : TextLayout) -> Unit raise TextError {
-  if layout.dpi <= 0.0 ||
-    layout.dpi > 1000000.0 ||
-    layout.dpi.is_nan() ||
-    layout.dpi.is_inf() {
-    raise InvalidDpi(layout.dpi)
+fn TextLayout::validate(self : TextLayout) -> Unit raise TextError {
+  if self.dpi <= 0.0 ||
+    self.dpi > 1000000.0 ||
+    self.dpi.is_nan() ||
+    self.dpi.is_inf() {
+    raise InvalidDpi(self.dpi)
   }
-  match layout.width {
-    Some(width) if width < 0.0 =>
+  if self.width is Some(width) {
+    if width < 0.0 {
       raise InvalidLayout("width must be non-negative")
-    Some(width) => validate_pango_value(width, "width")
-    _ => ()
+    }
+    TextLayout::validate_pango_value(width, "width")
   }
-  match layout.height {
-    Some(height) if height < 0.0 =>
+  if self.height is Some(height) {
+    if height < 0.0 {
       raise InvalidLayout("height must be non-negative")
-    Some(height) => validate_pango_value(height, "height")
-    _ => ()
+    }
+    TextLayout::validate_pango_value(height, "height")
   }
-  match layout.max_lines {
-    Some(lines) if lines <= 0 =>
-      raise InvalidLayout("max_lines must be greater than zero")
-    _ => ()
+  if self.max_lines is Some(lines) && lines <= 0 {
+    raise InvalidLayout("max_lines must be greater than zero")
   }
-  match layout.line_spacing {
-    Some(spacing) if spacing < 0.0 ||
+  if self.line_spacing is Some(spacing) &&
+    (
+      spacing < 0.0 ||
       spacing > 1000000.0 ||
       spacing.is_nan() ||
-      spacing.is_inf() =>
-      raise InvalidLayout("line_spacing must be finite and non-negative")
-    _ => ()
+      spacing.is_inf()
+    ) {
+    raise InvalidLayout("line_spacing must be finite and non-negative")
   }
-  validate_pango_value(layout.indent, "indent")
-  validate_pango_value(layout.spacing, "spacing")
+  TextLayout::validate_pango_value(self.indent, "indent")
+  TextLayout::validate_pango_value(self.spacing, "spacing")
 }
 
 ///|
-fn slant_code(slant : FontSlant) -> Int {
-  match slant {
-    NormalSlant => 0
-    Oblique => 1
-    Italic => 2
-  }
-}
-
-///|
-fn weight_code(weight : FontWeight) -> Int {
-  match weight {
-    Thin => 100
-    UltraLight => 200
-    Light => 300
-    SemiLight => 350
-    Book => 380
-    NormalWeight => 400
-    Medium => 500
-    SemiBold => 600
-    Bold => 700
-    UltraBold => 800
-    Heavy => 900
-    UltraHeavy => 1000
+fn FontSlant::to_pango(self : FontSlant) -> @pango.Style {
+  match self {
+    NormalSlant => @pango.Style::Normal
+    Oblique => @pango.Style::Oblique
+    Italic => @pango.Style::Italic
   }
 }
 
 ///|
-fn stretch_code(stretch : FontStretch) -> Int {
-  match stretch {
-    UltraCondensed => 0
-    ExtraCondensed => 1
-    Condensed => 2
-    SemiCondensed => 3
-    NormalStretch => 4
-    SemiExpanded => 5
-    Expanded => 6
-    ExtraExpanded => 7
-    UltraExpanded => 8
+fn FontWeight::to_pango(self : FontWeight) -> @pango.Weight {
+  match self {
+    Thin => @pango.Weight::Thin
+    UltraLight => @pango.Weight::Ultralight
+    Light => @pango.Weight::Light
+    SemiLight => @pango.Weight::Semilight
+    Book => @pango.Weight::Book
+    NormalWeight => @pango.Weight::Normal
+    Medium => @pango.Weight::Medium
+    SemiBold => @pango.Weight::Semibold
+    Bold => @pango.Weight::Bold
+    UltraBold => @pango.Weight::Ultrabold
+    Heavy => @pango.Weight::Heavy
+    UltraHeavy => @pango.Weight::Ultraheavy
   }
 }
 
 ///|
-fn alignment_code(alignment : TextAlignment) -> Int {
-  match alignment {
-    AlignLeft => 0
-    AlignCenter => 1
-    AlignRight => 2
+fn FontStretch::to_pango(self : FontStretch) -> @pango.Stretch {
+  match self {
+    UltraCondensed => @pango.Stretch::UltraCondensed
+    ExtraCondensed => @pango.Stretch::ExtraCondensed
+    Condensed => @pango.Stretch::Condensed
+    SemiCondensed => @pango.Stretch::SemiCondensed
+    NormalStretch => @pango.Stretch::Normal
+    SemiExpanded => @pango.Stretch::SemiExpanded
+    Expanded => @pango.Stretch::Expanded
+    ExtraExpanded => @pango.Stretch::ExtraExpanded
+    UltraExpanded => @pango.Stretch::UltraExpanded
   }
 }
 
 ///|
-fn wrap_code(wrap : TextWrap) -> Int {
-  match wrap {
-    WrapWord => 0
-    WrapChar => 1
-    WrapWordChar => 2
-    NoWrap => 3
+fn TextAlignment::to_pango(self : TextAlignment) -> @pango.Alignment {
+  match self {
+    AlignLeft => @pango.Alignment::Left
+    AlignCenter => @pango.Alignment::Center
+    AlignRight => @pango.Alignment::Right
   }
 }
 
 ///|
-fn ellipsize_code(ellipsize : TextEllipsize) -> Int {
-  match ellipsize {
-    NoEllipsize => 0
-    EllipsizeStart => 1
-    EllipsizeMiddle => 2
-    EllipsizeEnd => 3
+fn TextWrap::to_pango(self : TextWrap) -> @pango.WrapMode {
+  match self {
+    WrapWord => @pango.WrapMode::Word
+    WrapChar => @pango.WrapMode::Char
+    WrapWordChar => @pango.WrapMode::WordChar
+    NoWrap => @pango.WrapMode::None
   }
 }
 
 ///|
-fn direction_code(direction : TextDirection) -> Int {
-  match direction {
-    AutoDirection => -1
-    LeftToRight => 0
-    RightToLeft => 1
+fn TextEllipsize::to_pango(self : TextEllipsize) -> @pango.EllipsizeMode {
+  match self {
+    NoEllipsize => @pango.EllipsizeMode::None
+    EllipsizeStart => @pango.EllipsizeMode::Start
+    EllipsizeMiddle => @pango.EllipsizeMode::Middle
+    EllipsizeEnd => @pango.EllipsizeMode::End
   }
 }
 
 ///|
-fn underline_code(underline : TextUnderline) -> Int {
-  match underline {
-    NoUnderline => 0
-    SingleUnderline => 1
-    DoubleUnderline => 2
-    LowUnderline => 3
-    ErrorUnderline => 4
+fn TextDirection::to_pango(self : TextDirection) -> @pango.Direction {
+  match self {
+    AutoDirection => @pango.Direction::WeakLtr
+    LeftToRight => @pango.Direction::Ltr
+    RightToLeft => @pango.Direction::Rtl
+  }
+}
+
+///|
+fn TextUnderline::to_pango(self : TextUnderline) -> @pango.Underline {
+  match self {
+    NoUnderline => @pango.Underline::None
+    SingleUnderline => @pango.Underline::Single
+    DoubleUnderline => @pango.Underline::Double
+    LowUnderline => @pango.Underline::Low
+    ErrorUnderline => @pango.Underline::Error
   }
 }

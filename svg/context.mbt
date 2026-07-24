@@ -18,9 +18,9 @@ fn SvgContext::root(
   diagnostics : Array[SvgDiagnostic],
 ) -> SvgContext {
   {
-    style: default_style.map_or(SvgStyle::default(), SvgStyle::from_shape_style),
+    style: default_style.map_or(Default::default(), SvgStyle::from_shape_style),
     transform: @object.Transform::identity(),
-    viewport: SvgViewport::default(),
+    viewport: Default::default(),
     definitions,
     references: [],
     groups,
