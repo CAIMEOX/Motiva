@@ -12,6 +12,22 @@ fn patch_put_object(patch : FramePatch, id : ObjectId) -> @object.Object? {
 }
 
 ///|
+fn patch_rebuild_object(patch : FramePatch, id : ObjectId) -> @object.Object? {
+  let mut result : @object.Object? = None
+  for op in patch.ops {
+    match (result, op) {
+      (Some(_), _) => ()
+      (None, Rebuild(current, object)) =>
+        if current == id {
+          result = Some(object)
+        }
+      _ => ()
+    }
+  }
+  result
+}
+
+///|
 fn path_style(object : @object.Object) -> @object.ShapeStyle raise {
   match object.node {
     Path(_, style) => style
@@ -41,7 +57,7 @@ test "active animation compile captures object op target without mutating scene"
   guard patch_put_object(patch, square) is Some(sampled) else {
     fail("sample should put interpolated object")
   }
-  assert_close(sampled.transform.m03, 2.0)
+  assert_close(sampled.center().x, 2.0)
 }
 
 ///|
@@ -200,6 +216,135 @@ test "active transform morphs incompatible path commands through point buffer" {
   assert_eq(path.commands.length(), 10)
   let buffer = path.eval()
   assert_eq(buffer.curve_count(), 8)
+}
+
+///|
+test "active transform rebuilds unequal object families before sampling" {
+  let scene = Scene::new()
+  let source = scene.object(
+    @object.Object::group([
+      @object.into_object(@object.Square::new(side_length=1.0)),
+    ]),
+  )
+  guard scene.children(source) is [original_child] else {
+    fail("source should begin with one child")
+  }
+  let target = @object.Object::group([
+    @object.into_object(@object.Circle::new(radius=0.35)),
+    @object.into_object(@object.Circle::new(radius=0.35)),
+    @object.into_object(@object.Circle::new(radius=0.35)),
+  ]).arrange(direction=@object.Vec3::unit_x(), buff=0.3)
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::transform(source, target),
+  )
+  guard patch_rebuild_object(active.begin_patch(), source) is Some(begin) &&
+    begin.node is Group(begin_children) else {
+    fail("transform begin should rebuild the aligned family")
+  }
+  assert_eq(begin_children.length(), 3)
+  scene.apply_frame_patch(active.begin_patch())
+  guard scene.children(source) is [same_child, _, _] else {
+    fail("aligned family should contain three addressable children")
+  }
+  assert_true(same_child == original_child)
+  scene.apply_frame_patch(active.sample(0.5))
+  scene.apply_frame_patch(active.finish_patch())
+  guard scene.children(source) is [final_child, _, _] else {
+    fail("final target family should keep three children")
+  }
+  assert_true(final_child == original_child)
+}
+
+///|
+test "active transform retires surplus family members after shrinking" {
+  let scene = Scene::new()
+  let source = scene.object(
+    @object.Object::group([
+      @object.into_object(@object.Square::new(side_length=0.8)),
+      @object.into_object(@object.Square::new(side_length=0.8)),
+      @object.into_object(@object.Square::new(side_length=0.8)),
+    ]).arrange(direction=@object.Vec3::unit_x(), buff=0.3),
+  )
+  guard scene.children(source) is [first, second, third] else {
+    fail("source should begin with three children")
+  }
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::transform(
+      source,
+      @object.Object::group([
+        @object.into_object(@object.Circle::new(radius=0.5)),
+      ]),
+    ),
+  )
+  scene.apply_frame_patch(active.begin_patch())
+  scene.apply_frame_patch(active.sample(0.5))
+  guard patch_rebuild_object(active.finish_patch(), source) is Some(result) &&
+    result.node is Group([_]) else {
+    fail("transform finish should rebuild the smaller target family")
+  }
+  scene.apply_frame_patch(active.finish_patch())
+  guard scene.children(source) is [remaining] else {
+    fail("target family should contain one addressable child")
+  }
+  assert_true(remaining == first)
+  assert_true(scene.state(second) == Some(Removed))
+  assert_true(scene.state(third) == Some(Removed))
+}
+
+///|
+test "animation transform exposes circular point paths" {
+  let scene = Scene::new()
+  let source = scene.object(
+    @object.into_object(@object.Square::new(side_length=1.0)).with_transform(
+      @object.Transform::translate(@object.Vec3::new(x=-2.0, y=0.0)),
+    ),
+  )
+  let target = @object.into_object(@object.Square::new(side_length=1.0)).with_transform(
+    @object.Transform::translate(@object.Vec3::new(x=2.0, y=0.0)),
+  )
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::transform(
+      source,
+      target,
+      path=@object.MotionPath::arc(angle=@math.PI / 2.0),
+    ),
+  )
+  guard patch_put_object(active.sample(0.5), source) is Some(sampled) else {
+    fail("transform should sample the source object")
+  }
+  let center = sampled.center()
+  assert_close(center.x, 0.0)
+  assert_close(center.y, -0.8284271247461903)
+}
+
+///|
+test "transform lag ratio staggers aligned family members" {
+  let source_object = @object.Object::group([
+    @object.into_object(@object.Square::new(side_length=0.8)).with_transform(
+      @object.Transform::translate(@object.Vec3::new(x=-1.0, y=0.0)),
+    ),
+    @object.into_object(@object.Square::new(side_length=0.8)).with_transform(
+      @object.Transform::translate(@object.Vec3::new(x=1.0, y=0.0)),
+    ),
+  ])
+  let target_object = source_object.with_transform(
+    @object.Transform::translate(@object.Vec3::new(x=0.0, y=2.0)),
+  )
+  let scene = Scene::new()
+  let source = scene.object(source_object)
+  let active = ActiveAnimation::compile(
+    scene,
+    Animation::transform(source, target_object, rate_func=Linear, lag_ratio=1.0),
+  )
+  guard patch_put_object(active.sample(0.5), source) is Some(sampled) &&
+    sampled.node is Group([first, second]) else {
+    fail("staggered transform should sample both family members")
+  }
+  assert_close(first.center().y, 2.0)
+  assert_close(second.center().y, 0.0)
 }
 
 ///|
@@ -594,5 +739,5 @@ test "sample_at_time clamps elapsed time to local alpha" {
   guard patch_put_object(active.sample_at_time(8.0), square) is Some(sampled) else {
     fail("sample_at_time should put object")
   }
-  assert_close(sampled.transform.m03, 4.0)
+  assert_close(sampled.center().x, 4.0)
 }

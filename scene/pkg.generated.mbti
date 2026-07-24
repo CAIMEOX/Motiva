@@ -20,6 +20,7 @@ pub(all) suberror SceneError {
   ConflictingValueAnimations(ValueTracker)
   ConflictingCameraAnimations
   Camera(@camera.CameraError)
+  ObjectAlignment(@object.ObjectAlignmentError)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)
@@ -48,7 +49,7 @@ pub fn[T : IntoAnimation] Animation::replacement(source~ : ObjectId, target~ : O
 pub fn Animation::rotate(ObjectId, angle? : Double, axis? : @object.Vec3, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::scale(ObjectId, sx~ : Double, sy~ : Double, sz? : Double, about_point? : @object.Vec3, about_edge? : @object.Vec3, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
 pub fn Animation::set_value(ValueTracker, Double, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
-pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool) -> Self
+pub fn[T : @object.IntoObject] Animation::transform(ObjectId, T, run_time? : Double, rate_func? : RateFunc, reverse_rate_function? : Bool, lag_ratio? : Double, path? : @object.MotionPath) -> Self
 pub fn Animation::wait(Double) -> Self
 pub fn Animation::with_lag_ratio(Self, Double) -> Self
 pub fn Animation::with_rate_func(Self, RateFunc) -> Self
@@ -100,7 +101,7 @@ pub(all) enum AnimationKind {
   FadeOut(ObjectId, FadeSpec)
   SetValue(ValueTracker, Double)
   IncrementValue(ValueTracker, Double)
-  Transform(ObjectId, @object.Object)
+  Transform(ObjectId, TransformSpec)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
   Replacement(AnimationGroup, source~ : ObjectId, target~ : ObjectId)
@@ -281,6 +282,7 @@ pub fn Scene::suspend_camera_updating(Self) -> Unit
 pub fn Scene::suspend_updating(Self, ObjectId, recursive? : Bool) -> Unit raise SceneError
 pub fn Scene::suspend_value_updating(Self, ValueTracker) -> Unit raise SceneError
 pub fn Scene::time(Self) -> Double
+pub fn Scene::transform_matching(Self, ObjectId, ObjectId, @object.ObjectCorrespondence, run_time? : Double, rate_func? : RateFunc, path? : @object.MotionPath) -> Animation raise SceneError
 pub fn Scene::updater_count(Self) -> Int
 pub fn Scene::value(Self, ValueTracker) -> Double raise SceneError
 pub fn Scene::value_tracker(Self, Double) -> ValueTracker
@@ -317,6 +319,12 @@ pub fn Timing::with_auto_run_time(Self) -> Self
 pub fn Timing::with_lag_ratio(Self, Double) -> Self
 pub fn Timing::with_rate_func(Self, RateFunc) -> Self
 pub fn Timing::with_run_time(Self, Double) -> Self
+
+pub(all) struct TransformSpec {
+  target : @object.Object
+  path : @object.MotionPath
+}
+pub fn[T : @object.IntoObject] TransformSpec::new(T, path? : @object.MotionPath) -> Self
 
 pub struct UpdateContext {
   // private fields

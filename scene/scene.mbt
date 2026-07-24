@@ -55,6 +55,7 @@ pub(all) suberror SceneError {
   ConflictingValueAnimations(ValueTracker)
   ConflictingCameraAnimations
   Camera(@camera.CameraError)
+  ObjectAlignment(@object.ObjectAlignmentError)
   EmptyPlay
   InvalidRunTime(Double)
   InvalidFrameRate(Double)

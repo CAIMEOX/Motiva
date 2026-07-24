@@ -242,31 +242,28 @@ test "child animation converts world space through an affine parent" {
 }
 
 ///|
-test "animation topology errors are detected before scene mutation" {
+test "transform animation rebuilds a smaller target family" {
   let scene = @scene.Scene::new()
   let root = scene.object(two_object_family())
-  let result = try
-    scene.play([
-      @scene.Animation::transform(
-        root,
-        @object.Object::group([
-          @object.into_object(@object.Circle::new(radius=1.0)),
-        ]),
-        run_time=1.0,
-      ),
-    ])
-  catch {
-    error => Err(error)
-  } noraise {
-    _ => Ok(())
+  guard scene.children(root) is [first, second] else {
+    fail("source family should begin with two children")
   }
-  guard result is Err(@scene.FamilyTopologyMismatch(id)) else {
-    fail("invalid animation topology should return a typed SceneError")
+  scene.play([
+    @scene.Animation::transform(
+      root,
+      @object.Object::group([
+        @object.into_object(@object.Circle::new(radius=1.0)),
+      ]),
+      run_time=1.0,
+    ),
+  ])
+  guard scene.children(root) is [remaining] else {
+    fail("transform should rebuild the smaller target family")
   }
-  assert_same_id(id, root)
-  assert_eq(scene.visible_count(), 0)
-  assert_true(!scene.is_visible(root))
-  assert_family_close(scene.time(), 0.0)
+  assert_same_id(remaining, first)
+  assert_true(scene.state(second) == Some(@scene.Removed))
+  assert_true(scene.is_visible(root))
+  assert_family_close(scene.time(), 1.0)
 }
 
 ///|

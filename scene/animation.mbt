@@ -264,6 +264,20 @@ pub fn FadeSpec::new(
 }
 
 ///|
+pub(all) struct TransformSpec {
+  target : @object.Object
+  path : @object.MotionPath
+}
+
+///|
+pub fn[T : @object.IntoObject] TransformSpec::new(
+  target : T,
+  path? : @object.MotionPath = @object.MotionPath::straight(),
+) -> TransformSpec {
+  { target: @object.into_object(target), path }
+}
+
+///|
 pub(all) enum ObjectOp {
   ApplyTransform(@object.Transform)
   ScaleOp(ScaleSpec)
@@ -396,7 +410,7 @@ pub(all) enum AnimationKind {
   FadeOut(ObjectId, FadeSpec)
   SetValue(ValueTracker, Double)
   IncrementValue(ValueTracker, Double)
-  Transform(ObjectId, @object.Object)
+  Transform(ObjectId, TransformSpec)
   ApplyOps(ObjectId, Array[ObjectOp])
   Group(AnimationGroup)
   Replacement(AnimationGroup, source~ : ObjectId, target~ : ObjectId)
@@ -738,10 +752,17 @@ pub fn[T : @object.IntoObject] Animation::transform(
   run_time? : Double = 1.0,
   rate_func? : RateFunc = Linear,
   reverse_rate_function? : Bool = false,
+  lag_ratio? : Double = 0.0,
+  path? : @object.MotionPath = @object.MotionPath::straight(),
 ) -> Animation {
   Animation::new(
-    Transform(id, @object.into_object(target)),
-    timing=Timing::new(run_time~, rate_func~, reverse_rate_function~),
+    Transform(id, TransformSpec::new(target, path~)),
+    timing=Timing::new(
+      run_time~,
+      rate_func~,
+      reverse_rate_function~,
+      lag_ratio~,
+    ),
   )
 }
 

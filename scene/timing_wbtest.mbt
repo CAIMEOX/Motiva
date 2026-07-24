@@ -46,5 +46,5 @@ test "active animation samples builder custom rate function" {
   guard patch_put_object(active.sample_at_time(1.0), square) is Some(sampled) else {
     fail("custom rate function should sample an object")
   }
-  assert_timing_close(sampled.transform.m03, 1.0)
+  assert_timing_close(sampled.center().x, 1.0)
 }

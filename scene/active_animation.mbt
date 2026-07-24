@@ -23,7 +23,14 @@ priv enum ActiveAnimationKind {
   ActiveWait
   ActiveCamera(start~ : @camera.Camera, target~ : @camera.Camera)
   ActiveValue(ValueTracker, start~ : Double, target~ : Double)
-  ActiveTransform(ObjectId, start~ : @object.Object, target~ : @object.Object)
+  ActiveTransform(
+    ObjectId,
+    pair~ : @object.AlignedObjectPair,
+    final_target~ : @object.Object,
+    path~ : @object.MotionPath,
+    rebuild_begin~ : Bool,
+    rebuild_finish~ : Bool
+  )
   ActiveScale(ObjectId, start~ : @object.Object, spec~ : ScaleSpec)
   ActiveRotate(ObjectId, start~ : @object.Object, spec~ : RotationSpec)
   ActiveReveal(ObjectId, source~ : @object.Object, family_size~ : Int)
@@ -150,15 +157,19 @@ fn ActiveAnimation::compile(
         timing=animation.timing,
       )
     }
-    Transform(id, target) => {
+    Transform(id, spec) => {
       let start = scene.require_materialized_object(id)
-      scene.validate_replacement_topology(id, target)
-      ActiveAnimation::transform(id, start~, target~, timing=animation.timing)
+      ActiveAnimation::transform(
+        id,
+        start~,
+        target=spec.target,
+        path=spec.path,
+        timing=animation.timing,
+      )
     }
     ApplyOps(id, ops) => {
       let start = scene.require_materialized_object(id)
       let target = ops.fold(init=start, (object, op) => op.apply(object))
-      scene.validate_replacement_topology(id, target)
       ActiveAnimation::transform(id, start~, target~, timing=animation.timing)
     }
     Group(group) =>
@@ -230,12 +241,14 @@ fn ActiveAnimation::transform(
   id : ObjectId,
   start~ : @object.Object,
   target~ : @object.Object,
+  path? : @object.MotionPath = @object.MotionPath::straight(),
   timing~ : Timing,
-) -> ActiveAnimation {
+) -> ActiveAnimation raise SceneError {
   ActiveAnimation::transform_with_lifecycle(
     id,
     start~,
     target~,
+    path~,
     timing~,
     lifecycle=AnimationLifecycle::new(
       introducer=false,
@@ -250,15 +263,45 @@ fn ActiveAnimation::transform_with_lifecycle(
   id : ObjectId,
   start~ : @object.Object,
   target~ : @object.Object,
+  path? : @object.MotionPath = @object.MotionPath::straight(),
   timing~ : Timing,
   lifecycle~ : AnimationLifecycle,
-) -> ActiveAnimation {
+) -> ActiveAnimation raise SceneError {
+  let pair = start.align_for_interpolation(target) catch {
+    error => raise ObjectAlignment(error)
+  }
+  let aligned_start = pair.start()
+  let aligned_target = pair.target()
   {
-    kind: ActiveTransform(id, start~, target~),
+    kind: ActiveTransform(
+      id,
+      pair~,
+      final_target=target,
+      path~,
+      rebuild_begin=!same_family_topology(start, aligned_start),
+      rebuild_finish=!same_family_topology(aligned_target, target),
+    ),
     timing,
     run_time: timing.resolve_run_time(1.0),
     lifecycle,
     suspend_updaters: true,
+  }
+}
+
+///|
+fn same_family_topology(
+  start : @object.Object,
+  target : @object.Object,
+) -> Bool {
+  match (start.node, target.node) {
+    (Group(start_children), Group(target_children)) =>
+      start_children.length() == target_children.length() &&
+      start_children
+      .iter()
+      .zip(target_children.iter())
+      .all(pair => same_family_topology(pair.0, pair.1))
+    (Group(_), _) | (_, Group(_)) => false
+    _ => true
   }
 }
 
@@ -327,7 +370,7 @@ fn ActiveAnimation::fade_in(
   source~ : @object.Object,
   spec~ : FadeSpec,
   timing~ : Timing,
-) -> ActiveAnimation {
+) -> ActiveAnimation raise SceneError {
   ActiveAnimation::transform_with_lifecycle(
     id,
     start=make_faded_object(source, spec, fade_in=true),
@@ -347,7 +390,7 @@ fn ActiveAnimation::fade_out(
   source~ : @object.Object,
   spec~ : FadeSpec,
   timing~ : Timing,
-) -> ActiveAnimation {
+) -> ActiveAnimation raise SceneError {
   ActiveAnimation::transform_with_lifecycle(
     id,
     start=source,
@@ -579,9 +622,13 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
     ActiveWait => FramePatch::empty()
     ActiveCamera(start~, ..) => FramePatch::set_camera(start)
     ActiveValue(tracker, start~, ..) => FramePatch::set_value(tracker, start)
-    ActiveTransform(id, start~, ..) =>
+    ActiveTransform(id, pair~, rebuild_begin~, ..) =>
       FramePatch::all([
-        FramePatch::put(id, start),
+        if rebuild_begin {
+          FramePatch::rebuild(id, pair.start())
+        } else {
+          FramePatch::put(id, pair.start())
+        },
         FramePatch::ensure_visible(id),
       ])
     ActiveScale(id, start~, ..) =>
@@ -625,7 +672,7 @@ fn ActiveAnimation::begin_patch(self : ActiveAnimation) -> FramePatch {
 fn ActiveAnimation::sample(
   self : ActiveAnimation,
   raw_alpha : Double,
-) -> FramePatch {
+) -> FramePatch raise SceneError {
   let raw_alpha = clamp_alpha(raw_alpha)
   let alpha = self.timing.apply_rate(raw_alpha)
   if !self.lifecycle.has_frame_effect {
@@ -637,9 +684,16 @@ fn ActiveAnimation::sample(
         FramePatch::set_camera(start.interpolate(target, alpha))
       ActiveValue(tracker, start~, target~) =>
         FramePatch::set_value(tracker, lerp_double(start, target, alpha))
-      ActiveTransform(id, start~, target~) =>
+      ActiveTransform(id, pair~, path~, ..) =>
         FramePatch::all([
-          FramePatch::put(id, interpolate_object(start, target, alpha)),
+          FramePatch::put(
+            id,
+            pair.interpolate_family(alpha, path~, (index, family_size) => {
+              self.timing.family_alpha(raw_alpha, index, family_size)
+            }) catch {
+              error => raise ObjectAlignment(error)
+            },
+          ),
           FramePatch::ensure_visible(id),
         ])
       ActiveScale(id, start~, spec~) =>
@@ -683,7 +737,7 @@ fn ActiveAnimation::sample(
 fn ActiveAnimation::sample_at_time(
   self : ActiveAnimation,
   elapsed : Double,
-) -> FramePatch {
+) -> FramePatch raise SceneError {
   match self.kind {
     ActiveGroup(children, natural_run_time~, ..) =>
       self.sample_group_at_time(children, natural_run_time, elapsed)
@@ -692,7 +746,9 @@ fn ActiveAnimation::sample_at_time(
 }
 
 ///|
-fn ActiveAnimation::finish_patch(self : ActiveAnimation) -> FramePatch {
+fn ActiveAnimation::finish_patch(
+  self : ActiveAnimation,
+) -> FramePatch raise SceneError {
   match self.kind {
     ActiveGroup(children, replacement~, ..) => {
       let finished = FramePatch::all(
@@ -707,6 +763,22 @@ fn ActiveAnimation::finish_patch(self : ActiveAnimation) -> FramePatch {
               FramePatch::show_subtree(finish.target),
             ]),
           )
+      }
+    }
+    ActiveTransform(id, final_target~, rebuild_finish~, ..) => {
+      let final_patch = if rebuild_finish {
+        FramePatch::rebuild(id, final_target)
+      } else {
+        FramePatch::put(id, final_target)
+      }
+      let visible = FramePatch::all([
+        final_patch,
+        FramePatch::ensure_visible(id),
+      ])
+      if self.lifecycle.remover {
+        visible.then(FramePatch::hide(id))
+      } else {
+        visible
       }
     }
     _ => {
@@ -736,7 +808,7 @@ fn ActiveAnimation::sample_group_at_time(
   children : Array[ActiveChild],
   natural_run_time : Double,
   elapsed : Double,
-) -> FramePatch {
+) -> FramePatch raise SceneError {
   let group_alpha = self.alpha_at_time(elapsed)
   let group_time = group_alpha * natural_run_time
   FramePatch::all(children.map(child => child.sample_at_group_time(group_time)))
@@ -746,7 +818,7 @@ fn ActiveAnimation::sample_group_at_time(
 fn ActiveChild::sample_at_group_time(
   self : ActiveChild,
   group_time : Double,
-) -> FramePatch {
+) -> FramePatch raise SceneError {
   if group_time < self.start_time {
     FramePatch::empty()
   } else if group_time > self.end_time {

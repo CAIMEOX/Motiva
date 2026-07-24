@@ -60,13 +60,13 @@ test "play plan applies sampled animation state to scene" {
   guard scene.get(square) is Some(sampled) else {
     fail("sampled object should exist")
   }
-  assert_plan_close(sampled.transform.m03, 2.0)
+  assert_plan_close(sampled.center().x, 2.0)
   assert_plan_close(scene.time(), 1.0)
   plan.finish(scene)
   guard scene.get(square) is Some(finished) else {
     fail("finished object should exist")
   }
-  assert_plan_close(finished.transform.m03, 4.0)
+  assert_plan_close(finished.center().x, 4.0)
   assert_plan_close(scene.time(), 2.0)
 }
 

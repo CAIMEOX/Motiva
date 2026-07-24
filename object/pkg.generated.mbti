@@ -14,6 +14,14 @@ pub(all) suberror MeshError {
   VertexIndexOutOfBounds(face_index~ : Int, vertex_index~ : Int, vertex_count~ : Int)
 }
 
+pub(all) suberror ObjectAlignmentError {
+  Path(PathEvalError)
+  IncompatibleNodeKinds
+  MeshTopologyMismatch
+  AlignmentInvariantBroken
+  InvalidMotionPathPointCount(expected~ : Int, actual~ : Int)
+}
+
 pub(all) suberror PathBufferError {
   InvalidPointCount(Int)
 }
@@ -39,6 +47,14 @@ pub fn Aabb::point(Vec3) -> Self
 pub fn Aabb::transform(Self, Transform) -> Self
 pub fn Aabb::union(Self, Self) -> Self
 pub fn Aabb::width(Self) -> Double
+
+pub struct AlignedObjectPair {
+  // private fields
+}
+pub fn AlignedObjectPair::interpolate(Self, Double, path? : MotionPath) -> Object raise ObjectAlignmentError
+pub fn AlignedObjectPair::interpolate_family(Self, Double, path? : MotionPath, (Int, Int) -> Double) -> Object raise ObjectAlignmentError
+pub fn AlignedObjectPair::start(Self) -> Object
+pub fn AlignedObjectPair::target(Self) -> Object
 
 pub(all) struct Arc {
   radius : Double
@@ -127,6 +143,17 @@ pub fn Cone::new(base_radius? : Double, height? : Double, direction? : Vec3, sho
 pub fn Cone::surface(Self) -> Surface
 pub impl IntoObject for Cone
 
+pub(all) struct CorrespondenceBucket {
+  source : Array[FamilyPath]
+  target : Array[FamilyPath]
+}
+
+pub(all) struct CorrespondencePart[K] {
+  path : FamilyPath
+  key : K
+}
+pub fn[K] CorrespondencePart::new(FamilyPath, K) -> Self[K]
+
 pub(all) struct Cube {
   side_length : Double
   style : ShapeStyle
@@ -191,7 +218,7 @@ pub impl IntoObject for Dot3D
 
 pub struct FamilyPath {
   // private fields
-} derive(Eq, @debug.Debug)
+} derive(Eq, Hash, @debug.Debug)
 pub fn FamilyPath::child(Self, Int) -> Self
 pub fn FamilyPath::indices(Self) -> Array[Int]
 pub fn FamilyPath::root() -> Self
@@ -257,6 +284,15 @@ pub(all) struct MeshFace3D {
 }
 pub fn MeshFace3D::new(Array[Int]) -> Self
 
+pub(all) enum MotionPath {
+  Straight
+  Arc(angle~ : Double, axis~ : Vec3)
+  Custom((Array[Vec3], Array[Vec3], Double) -> Array[Vec3])
+}
+pub fn MotionPath::arc(angle~ : Double, axis? : Vec3) -> Self
+pub fn MotionPath::custom((Array[Vec3], Array[Vec3], Double) -> Array[Vec3]) -> Self
+pub fn MotionPath::straight() -> Self
+
 pub(all) enum Node {
   Empty
   Group(Array[Object])
@@ -289,6 +325,7 @@ pub(all) struct Object {
   z_index : Double
   node : Node
 }
+pub fn Object::align_for_interpolation(Self, Self) -> AlignedObjectPair raise ObjectAlignmentError
 pub fn Object::align_to(Self, Self, direction~ : Vec3) -> Self
 pub fn Object::arrange(Self, direction? : Vec3, buff? : Double, center? : Bool, aligned_edge? : Vec3) -> Self
 pub fn Object::bounds(Self) -> Aabb?
@@ -308,6 +345,14 @@ pub fn Object::set_stroke(Self, color? : Rgba, width? : Double, opacity? : Doubl
 pub fn Object::with_transform(Self, Transform) -> Self
 pub fn Object::with_z_index(Self, Double) -> Self
 pub impl IntoObject for Object
+
+pub struct ObjectCorrespondence {
+  // private fields
+}
+pub fn ObjectCorrespondence::buckets(Self) -> Array[CorrespondenceBucket]
+pub fn[K : Hash + Eq] ObjectCorrespondence::by_key(Array[CorrespondencePart[K]], Array[CorrespondencePart[K]], key_map? : Map[K, K]) -> Self
+pub fn ObjectCorrespondence::source_only(Self) -> Array[FamilyPath]
+pub fn ObjectCorrespondence::target_only(Self) -> Array[FamilyPath]
 
 pub(all) struct Octahedron {
   edge_length : Double
